@@ -3,6 +3,6 @@
     "."
   ],
   "search_path": [
-    "C:/project/bot/.venv/Lib/site-packages"
+    ".venv/Lib/site-packages"
   ]
 }

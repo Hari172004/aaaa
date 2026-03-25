@@ -6,6 +6,7 @@ Detects BOS, CHOCH, Order Blocks, and FVGs for Bitcoin.
 
 import pandas as pd # type: ignore
 import numpy as np
+from typing import List, Dict, Any
 
 class BTCMarketStructure:
     """Analyzes BTC price action for Smart Money Concepts."""
@@ -36,7 +37,7 @@ class BTCMarketStructure:
             bos = "BEARISH"
 
         # FVG Detection
-        fvgs = []
+        fvgs: List[Dict[str, Any]] = []
         for i in range(2, len(df)):
             # Bullish FVG
             if df["low"].iloc[i] > df["high"].iloc[i-2]:
@@ -56,7 +57,7 @@ class BTCMarketStructure:
                 })
 
         # Order Blocks (Last candle before impulsive move)
-        obs = []
+        obs: List[Dict[str, Any]] = []
         # (Simplified: find largest candles and pick the previous one)
         df["body_size"] = (df["close"] - df["open"]).abs()
         mean_body = df["body_size"].mean()
@@ -74,6 +75,6 @@ class BTCMarketStructure:
 
         return {
             "bos": bos,
-            "fvgs": fvgs[-5:], # latest 5
-            "obs": obs[-5:]    # latest 5
+            "fvgs": fvgs[-5:], # type: ignore
+            "obs": obs[-5:]    # type: ignore
         }

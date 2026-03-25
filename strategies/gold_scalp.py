@@ -5,10 +5,11 @@ Max 5 trades/session, no trades 30 mins before news, min 10 pip SL.
 """
 
 import logging
-import pandas as pd
-from analysis.gold_indicators import calculate_gold_indicators
-from analysis.gold_market_structure import detect_gold_smc, near_ob, near_fvg
-from analysis.gold_sessions import is_gold_scalp_time, get_current_gold_session
+from datetime import datetime, timezone
+import pandas as pd # type: ignore
+from analysis.gold_indicators import calculate_gold_indicators # type: ignore
+from analysis.gold_market_structure import detect_gold_smc, near_ob, near_fvg # type: ignore
+from analysis.gold_sessions import is_gold_scalp_time, get_current_gold_session # type: ignore
 
 logger = logging.getLogger("apexalgo.gold_scalp")
 
@@ -22,10 +23,10 @@ class GoldScalpStrategy:
 
     # ── Public API ────────────────────────────────────────────────────────
 
-    def generate_signal(self, df: pd.DataFrame) -> dict:
+    def generate_signal(self, df: pd.DataFrame, df_h1: pd.DataFrame = None, 
+                        is_nano: bool = False, ignore_sessions: bool = False, is_sniper: bool = False) -> dict:
         """
-        Apply all scalping rules and return a signal dict.
-        Returns: {signal, strength, reason, atr, sl_distance, tp_distance}
+        Main entry point for generating scalp signals.
         """
         empty = {"signal": "HOLD", "strength": 0.0, "reason": "No setup", "atr": 0.0,
                  "sl_distance": 0.0, "tp_distance": 0.0}
@@ -33,108 +34,156 @@ class GoldScalpStrategy:
         if df.empty or len(df) < 50:
             return empty
 
-        # 1. Kill Zone gating (no Asian session scalps, no LBMA)
-        if not is_gold_scalp_time():
-            sess = get_current_gold_session()
-            reason = "LBMA fix window" if sess["is_lbma_fix"] else "Outside Kill Zone"
-            return {**empty, "reason": reason}
+        last  = df.iloc[-1]
+        prev  = df.iloc[-2]
+        live_close_val = float(last["close"])
 
-        # 2. Session trade limit
-        session_key = self._session_key()
-        trades_this_session = self._session_trades.get(session_key, 0)
-        if trades_this_session >= MAX_SCALPS_PER_SESSION:
-            return {**empty, "reason": f"Max {MAX_SCALPS_PER_SESSION} scalps hit this session"}
+        # 1. Kill Zone gating
+        if not is_gold_scalp_time(ignore_lbma=ignore_sessions, ignore_asian=ignore_sessions):
+            if not ignore_sessions:
+                sess = get_current_gold_session()
+                reason = "LBMA fix window" if sess["is_lbma_fix"] else "Outside Kill Zone"
+                return {**empty, "reason": reason}
 
-        # 3. Compute indicators
+        # 2. HTF Trend Alignment (H1 EMA 100)
+        h1_bullish, h1_bearish = True, True # default if no H1
+        if df_h1 is not None and not df_h1.empty:
+            df_h1 = calculate_gold_indicators(df_h1)
+            h1_last = df_h1.iloc[-1]
+            ema100_h1 = h1_last.get("ema_100", h1_last.get("ema_200", 0))
+            h1_bullish = float(h1_last["close"]) > ema100_h1
+            h1_bearish = float(h1_last["close"]) < ema100_h1
+
+        # 3. Indicators & SMC (ICT Sniper V2.0)
         df = calculate_gold_indicators(df)
         smc = detect_gold_smc(df)
-
+        
+        # Refresh snapshots after indicators are added
         last  = df.iloc[-1]
         prev  = df.iloc[-2]
 
+        from strategies.smc import SMCEngine # type: ignore
+        smc_v2 = SMCEngine.get_smc_context(df, live_close_val)
+
+        # Ensure required columns are present (prevents KeyError if history < 30)
+        required = ["ema_9", "ema_21", "ema_50", "rsi", "atr"]
+        missing = [col for col in required if col not in last or col not in prev]
+        if missing:
+             logger.debug(f"[GoldScalp] Missing indicators: {missing} | df_len={len(df)}")
+             return {**empty, "reason": f"Waiting for {missing} to stabilise (df_len={len(df)})"}
+        
         atr   = float(last.get("atr", 0))
-        close = float(last["close"])
+        
+        # 4. Filter: 13:00 - 17:00 GMT (NY Session) for Sniper precision
+        is_ny_kill_zone = 13 <= datetime.now(timezone.utc).hour <= 17
+        if is_sniper and not is_ny_kill_zone:
+             return {**empty, "reason": "Sniper: Outside NY High-Liquidity Window (13-17 GMT)"}
 
-        # 4. Bollinger Band squeeze check (no scalp if BB flat)
-        bb_squeeze = bool(last.get("bb_squeeze", False))
-        if bb_squeeze:
-            return {**empty, "reason": "BB squeeze flat — waiting for breakout"}
+        # 5. Momentum: 50 EMA + RSI (M1/M5)
+        ema50 = float(last.get("ema_50", 0))
+        rsi   = float(last.get("rsi", 50))
+        rsi_bullish = rsi > 50 and prev.get("rsi", 50) <= 50
+        rsi_bearish = rsi < 50 and prev.get("rsi", 50) >= 50
+        momentum_scalp_up = live_close_val > ema50 and rsi_bullish
+        momentum_scalp_down = live_close_val < ema50 and rsi_bearish
 
-        # 5. ATR spike guard (no scalp if volatility extreme)
-        atr_spike = bool(last.get("atr_spike", False))
-        if atr_spike:
-            return {**empty, "reason": "ATR spike detected — paused"}
+        # Volume RVOL: Current Volume vs 20-period MA
+        vol_avg = df["volume"].tail(20).mean()
+        rvol = last["volume"] / vol_avg if vol_avg > 0 else 1.0
 
-        # 6. EMA crossover
-        ema9_now  = float(last.get("ema_9", 0))
-        ema21_now = float(last.get("ema_21", 0))
-        ema9_prev = float(prev.get("ema_9", 0))
-        ema21_prev= float(prev.get("ema_21", 0))
-        ema_cross_up   = ema9_prev <= ema21_prev and ema9_now > ema21_now
-        ema_cross_down = ema9_prev >= ema21_prev and ema9_now < ema21_now
+        # Squeeze check
+        if bool(last.get("bb_squeeze", False)):
+            return {**empty, "reason": "BB Squeeze (Low Volatility)"}
 
-        # 7. RSI filter (40-60 = neutral/momentum range for entry)
-        rsi = float(last.get("rsi", 50))
-        rsi_ok = 38 <= rsi <= 62
+        # ── ICT/SMC Triggers ──────────────────
+        
+        # ICT Setup: Sweep + Displacement + FVG Retest
+        ict_buy_setup = smc_v2["bullish_sweep"] and smc_v2["displacement"] and near_fvg(live_close_val, smc.get("fvgs", []))
+        ict_sell_setup = smc_v2["bearish_sweep"] and smc_v2["displacement"] and near_fvg(live_close_val, smc.get("fvgs", []))
 
-        # 8. MACD confirmation
-        macd_hist = float(last.get("macd_hist", 0))
-        macd_bull = macd_hist > 0
-        macd_bear = macd_hist < 0
+        # ── Channel & Heiken Ashi Breakout ─────
+        ema_55_high = float(last.get("ema_55_high", 0))
+        ema_55_low  = float(last.get("ema_55_low", 0))
+        ha_bull     = bool(last.get("ha_bull", False))
+        
+        channel_break_up = live_close_val > ema_55_high and ha_bull
+        channel_break_dn = live_close_val < ema_55_low and not ha_bull
+        in_channel = ema_55_low <= live_close_val <= ema_55_high
 
-        # 9. Volume spike
-        vol       = float(last.get("volume", 0))
-        vol_avg   = float(df["volume"].tail(20).mean())
-        vol_spike = vol > vol_avg * 1.3
+        if is_sniper and in_channel:
+             return {**empty, "reason": "Sniper: Price inside 55-MA Channel (Choppy)"}
 
-        # 10. SMC alignment
-        bull_obs = smc.get("bull_obs", [])
-        bear_obs = smc.get("bear_obs", [])
-        in_bull_ob = near_ob(close, bull_obs)
-        in_bear_ob = near_ob(close, bear_obs)
-        in_fvg     = near_fvg(close, smc.get("fvgs", []))
-
-        # ── Build signal ──────────────────────────────────────────────────
-
+        # ── Trigger Selection ─────────────────
+        
         signal   = "HOLD"
         strength = 0.0
         reasons  = []
+        hold_reasons = []
 
-        if ema_cross_up and rsi_ok and macd_bull:
-            signal   = "BUY"
-            strength = 0.60
-            reasons.append("EMA9 > EMA21 + RSI OK + MACD Bull")
-            if vol_spike:
-                strength += 0.10; reasons.append("Volume spike")
-            if in_bull_ob or in_fvg:
-                strength += 0.15; reasons.append("Inside Bull OB/FVG")
+        # BUY Logic
+        ema_cross_up = last["ema_9"] > last["ema_21"] and prev["ema_9"] <= prev["ema_21"]
+        is_buy_trigger = ict_buy_setup or momentum_scalp_up or ema_cross_up or channel_break_up
+        
+        if is_buy_trigger:
+            if not h1_bullish: hold_reasons.append("H1 Trend Bearish")
+            if rvol < 1.1:           hold_reasons.append(f"Low RVOL ({rvol:.1f})")
+            if is_sniper and not ha_bull: hold_reasons.append("HA Candle Red")
+            
+            if not hold_reasons:
+                # Scalp Sniper: MUST have SMC or HTF Trend + RVOL
+                if is_sniper or is_nano:
+                    if not (ict_buy_setup or near_ob(live_close_val, smc.get("bull_obs", [])) or channel_break_up):
+                         return {**empty, "reason": "Sniper: Waiting for ICT Sweep, OB or HA Breakout"}
 
-        elif ema_cross_down and rsi_ok and macd_bear:
-            signal   = "SELL"
-            strength = 0.60
-            reasons.append("EMA9 < EMA21 + RSI OK + MACD Bear")
-            if vol_spike:
-                strength += 0.10; reasons.append("Volume spike")
-            if in_bear_ob or in_fvg:
-                strength += 0.15; reasons.append("Inside Bear OB/FVG")
+                signal   = "BUY"
+                strength = 0.75 # Baseline for V2.0
+                if ict_buy_setup: strength += 0.15; reasons.append("ICT Sweep+FVG")
+                elif channel_break_up: strength += 0.10; reasons.append("HA Breakout")
+                elif momentum_scalp_up: strength += 0.05; reasons.append("EMA+RSI Scalp")
+                
+                if h1_bullish: strength += 0.10; reasons.append("H1 Trend+")
+                if rvol > 1.5: strength += 0.05; reasons.append("Vol Spike")
+
+        # SELL Logic
+        if signal == "HOLD":
+            ema_cross_down = last["ema_9"] < last["ema_21"] and prev["ema_9"] >= prev["ema_21"]
+            is_sell_trigger = ict_sell_setup or momentum_scalp_down or ema_cross_down or channel_break_dn
+            
+            if is_sell_trigger:
+                if not h1_bearish: hold_reasons.append("H1 Trend Bullish")
+                if rvol < 1.1:           hold_reasons.append(f"Low RVOL ({rvol:.1f})")
+                if is_sniper and ha_bull: hold_reasons.append("HA Candle Green")
+
+                if not hold_reasons:
+                    if is_sniper or is_nano:
+                        if not (ict_sell_setup or near_ob(live_close_val, smc.get("bear_obs", [])) or channel_break_dn):
+                             return {**empty, "reason": "Sniper: Waiting for ICT Sweep, OB or HA Breakout"}
+
+                    signal   = "SELL"
+                    strength = 0.75
+                    if ict_sell_setup: strength += 0.15; reasons.append("ICT Sweep+FVG")
+                    elif channel_break_dn: strength += 0.10; reasons.append("HA Breakout")
+                    elif momentum_scalp_down: strength += 0.05; reasons.append("EMA+RSI Scalp")
+                    
+                    if h1_bearish: strength += 0.10; reasons.append("H1 Trend-")
+                    if rvol > 1.5: strength += 0.05; reasons.append("Vol Spike")
 
         if signal != "HOLD":
-            # Minimum SL check — 10 pips (0.10 on XAUUSD)
-            sl_dist = max(1.0 * atr, 1.0)   # 1x ATR or minimum $1
-            tp_dist = sl_dist * 2.0           # 1:2 RR minimum
-
+            sl_dist = max(atr * 1.5, 1.0)
+            tp_dist = sl_dist * 2.0
+            
             return {
                 "signal":      signal,
-                "strength":    round(min(strength, 1.0), 3),
+                "strength":    float(round(float(min(strength, 1.0)), 3)),
                 "reason":      ", ".join(reasons),
                 "atr":         atr,
                 "sl_distance": sl_dist,
                 "tp_distance": tp_dist,
                 "rsi":         rsi,
-                "kill_zone":   get_current_gold_session()["active_kz"],
+                "rvol":        rvol
             }
 
-        return {**empty, "reason": "No EMA cross + RSI + MACD alignment"}
+        return {**empty, "reason": "Searching: " + (", ".join(hold_reasons) if hold_reasons else "Pattern match fail")}
 
     def record_trade(self):
         """Call this when a scalp trade is placed to track session limit."""

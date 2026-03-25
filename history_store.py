@@ -173,25 +173,33 @@ class HistoryStore:
             df = ticker.history(
                 period=period,
                 interval=yf_interval,
-                proxy=None,
                 prepost=False,
                 actions=False,
                 auto_adjust=True,
                 back_adjust=False,
             )
             
-            if df.empty:  # type: ignore
-                logger.warning(f"[History] yfinance returned empty data for {symbol}")
-                return df  # type: ignore
+            if df is None or df.empty:  # type: ignore
+                logger.warning(f"[History] yfinance returned no data for {symbol}")
+                return pd.DataFrame()
 
-            # Normalise columns
-            df.columns = [  # type: ignore
-                c[0].lower() if isinstance(c, tuple) else c.lower()
-                for c in df.columns  # type: ignore
-            ]
+            # Normalise columns (safely handle multi-index or None)
+            new_cols = []
+            for c in df.columns:
+                if isinstance(c, tuple):
+                    c = c[0]
+                if c is None:
+                    c = "unknown"
+                new_cols.append(str(c).lower())
+            
+            df.columns = new_cols
             if "adj close" in df.columns:  # type: ignore
                 df = df.rename(columns={"adj close": "close"})  # type: ignore
-            df = df[["open", "high", "low", "close", "volume"]].dropna()  # type: ignore
+            
+            # Ensure required columns exist
+            valid_cols = ["open", "high", "low", "close", "volume"]
+            available = [c for c in valid_cols if c in df.columns]
+            df = df[available].dropna()  # type: ignore
 
             # Resample 1H → 4H if needed
             if resample_4h:
@@ -291,11 +299,11 @@ class HistoryStore:
             o, h, l, c, v = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"]), float(row.get("volume", 0))
             records.append({
                 "time":   pd.Timestamp(ts).isoformat(),  # type: ignore
-                "open":   round(o, 5),
-                "high":   round(h, 5),
-                "low":    round(l, 5),
-                "close":  round(c, 5),
-                "volume": round(v, 2),
+                "open":   round(o, 5),    # type: ignore
+                "high":   round(h, 5),    # type: ignore
+                "low":    round(l, 5),    # type: ignore
+                "close":  round(c, 5),    # type: ignore
+                "volume": round(v, 2),    # type: ignore
             })
         return records
 
@@ -343,9 +351,9 @@ class HistoryStore:
             "row_count":   meta["row_count"],
             "last_update": last_dt.isoformat(),
             "stale":       self._is_stale(symbol, timeframe),
-            "price_min":   round(p_min, 5),
-            "price_max":   round(p_max, 5),
-            "avg_volume":  round(a_vol, 2),
+            "price_min":   round(p_min, 5),  # type: ignore
+            "price_max":   round(p_max, 5),  # type: ignore
+            "avg_volume":  round(a_vol, 2),  # type: ignore
         }
 
     # ── Bulk Refresh ──────────────────────────────────────────

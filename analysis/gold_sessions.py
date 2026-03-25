@@ -97,18 +97,20 @@ def get_current_gold_session_simple() -> dict:
     return get_current_gold_session()
 
 
-def is_gold_scalp_time() -> bool:
+def is_gold_scalp_time(ignore_lbma: bool = False, ignore_asian: bool = False) -> bool:
     """
     True only during London or NY Kill Zone.
-    Scalping is disabled during Asian session and LBMA fix windows.
+    Scalping is disabled during Asian session and LBMA fix windows unless ignored.
     """
     info = get_current_gold_session()
-    if info["is_lbma_fix"]:
+    if info["is_lbma_fix"] and not ignore_lbma:
         logger.info("[Sessions] LBMA fix window active — scalping paused")
         return False
-    if info["is_asian"]:
+    
+    if info["is_asian"] and not ignore_asian:
         return False
-    return info["is_killzone"]
+        
+    return info["is_killzone"] or ignore_lbma or ignore_asian
 
 
 def is_lbma_fix_time() -> bool:

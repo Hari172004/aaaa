@@ -24,7 +24,8 @@ class ApexAlgoEncryption:
         if not self.master_key:
             # Fallback for development only: deterministic key from a known salt
             # In production, THIS MUST be set purely via ENV variable.
-            self.master_key = self.generate_key_from_password("apexalgo_dev_fallback", b"ante_salt")
+            key_bytes = self.generate_key_from_password("apexalgo_dev_fallback", b"ante_salt")
+            self.master_key = key_bytes.decode('utf-8')
         
         # Ensure it's a valid Fernet key (must be URL-safe base64 encoded, 32 bytes)
         try:

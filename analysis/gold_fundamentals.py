@@ -8,6 +8,7 @@ import logging
 import json
 from datetime import datetime, timezone
 from urllib.request import urlopen, Request
+from typing import List, Dict, Any
 
 logger = logging.getLogger("apexalgo.gold_fundamentals")
 
@@ -41,7 +42,8 @@ def _yf_fetch(symbol: str) -> dict:
                 "change": 0.0,
             }
             if data["prev"] != 0:
-                data["change"] = round(float((data["price"] - data["prev"]) / data["prev"] * 100), 3)
+                change_val = float((data["price"] - data["prev"]) / data["prev"] * 100)
+                data["change"] = round(float(change_val), 3)
             _CACHE[cache_key] = {"ts": now, "data": data}
             return data
     except Exception as e:
@@ -105,7 +107,8 @@ def get_gold_fundamental_score() -> dict:
     details["gld_change"] = gld_change
     details["gld_score"]  = gld_score
 
-    score = round(float(score), 2)
+    score_val: float = float(score)
+    score = round(float(score_val), 2)
     if score > 25:
         bias = "BULLISH"
     elif score < -25:

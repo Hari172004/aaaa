@@ -23,8 +23,9 @@ class BTCIndicators:
         # ── 1. EMA Suite ──────────────────────────────────────
         df["ema_9"]   = ta.trend.ema_indicator(close, window=9)  # type: ignore
         df["ema_21"]  = ta.trend.ema_indicator(close, window=21)  # type: ignore
-        df["ema_50"]  = ta.trend.ema_indicator(close, window=50)  # type: ignore
-        df["ema_200"] = ta.trend.ema_indicator(close, window=200)  # type: ignore
+        df["ema_50"]   = ta.trend.ema_indicator(close, window=50)  # type: ignore
+        df["ema_100"]  = ta.trend.ema_indicator(close, window=100) # type: ignore
+        df["ema_200"]  = ta.trend.ema_indicator(close, window=200) # type: ignore
 
         # ── 2. Momentum ───────────────────────────────────────
         df["rsi"] = ta.momentum.rsi(close, window=14)  # type: ignore
@@ -55,6 +56,19 @@ class BTCIndicators:
         # Supertrend
         df["supertrend_ub"] = df["bb_mid"] + (df["atr"] * 3)
         df["supertrend_lb"] = df["bb_mid"] - (df["atr"] * 3)
+
+        # 5. 55-MA Channel
+        df["ema_55_high"] = ta.trend.ema_indicator(high, window=55) # type: ignore
+        df["ema_55_low"]  = ta.trend.ema_indicator(low, window=55)  # type: ignore
+
+        # 6. Heiken Ashi
+        df["ha_close"] = (df["open"] + df["high"] + df["low"] + df["close"]) / 4
+        # Note: Approximate HA Open for vectorised calculation
+        df["ha_open"] = (df["open"].shift(1) + df["close"].shift(1)) / 2
+        df["ha_open"] = df["ha_open"].fillna((df["open"] + df["close"]) / 2)
+        df["ha_high"] = df[["high", "ha_open", "ha_close"]].max(axis=1)
+        df["ha_low"]  = df[["low", "ha_open", "ha_close"]].min(axis=1)
+        df["ha_bull"] = (df["ha_close"] > df["ha_open"]).astype(int)
 
         return df
 

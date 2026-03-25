@@ -9,6 +9,7 @@ import json
 import logging
 import threading
 import time
+from typing import Optional
 import websocket # type: ignore
 
 logger = logging.getLogger("apexalgo.binance")
@@ -22,37 +23,41 @@ class BinanceConnector:
     def __init__(self, symbol: str = "BTCUSDT"):
         self.symbol = symbol.lower()
         self.ws_url = f"wss://stream.binance.com:9443/ws/{self.symbol}@ticker"
-        self.ws = None
+        self.ws: Optional[websocket.WebSocketApp] = None
         self.latest_tick = {}
         self._running = False
-        self._thread = None
+        self._thread: Optional[threading.Thread] = None
 
     def start(self):
         """Starts the WebSocket connection in a background thread."""
         if self._running:
             return
         self._running = True
-        self._thread = threading.Thread(target=self._run_ws, daemon=True)
-        self._thread.start()
+        thread = threading.Thread(target=self._run_ws, daemon=True)
+        self._thread = thread
+        thread.start()
         logger.info(f"[Binance] WebSocket started for {self.symbol}")
 
     def stop(self):
         """Stops the WebSocket connection."""
         self._running = False
-        if self.ws:
-            self.ws.close()
+        ws = self.ws
+        if ws is not None:
+            ws.close()
         logger.info("[Binance] WebSocket stopped.")
 
     def _run_ws(self):
         while self._running:
             try:
-                self.ws = websocket.WebSocketApp(
+                ws = websocket.WebSocketApp(
                     self.ws_url,
                     on_message=self._on_message,
                     on_error=self._on_error,
                     on_close=self._on_close
                 )
-                self.ws.run_forever()
+                self.ws = ws
+                if ws:
+                    ws.run_forever()
             except Exception as e:
                 logger.error(f"[Binance] Connection error: {e}")
             

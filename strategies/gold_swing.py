@@ -5,11 +5,11 @@ fundamental score threshold, Fibonacci TP targets, partial close at TP1.
 """
 
 import logging
-import pandas as pd
-from analysis.gold_indicators import calculate_gold_indicators
-from analysis.gold_market_structure import detect_gold_smc, near_ob
-from analysis.gold_fundamentals import get_gold_fundamental_score
-from analysis.gold_sentiment import get_gold_news_sentiment
+import pandas as pd # type: ignore
+from analysis.gold_indicators import calculate_gold_indicators # type: ignore
+from analysis.gold_market_structure import detect_gold_smc, near_ob # type: ignore
+from analysis.gold_fundamentals import get_gold_fundamental_score # type: ignore
+from analysis.gold_sentiment import get_gold_news_sentiment # type: ignore
 
 logger = logging.getLogger("apexalgo.gold_swing")
 
@@ -109,7 +109,7 @@ class GoldSwingStrategy:
 
             return {
                 "signal":      signal,
-                "strength":    round(min(strength, 1.0), 3),
+                "strength":    round(float(min(strength, 1.0)), 3), # type: ignore
                 "reason":      ", ".join(reasons),
                 "atr":         atr,
                 "sl_distance": 2.5 * atr,
@@ -135,7 +135,7 @@ class GoldSwingStrategy:
 
             return {
                 "signal":      signal,
-                "strength":    round(min(strength, 1.0), 3),
+                "strength":    round(float(min(strength, 1.0)), 3), # type: ignore
                 "reason":      ", ".join(reasons),
                 "atr":         atr,
                 "sl_distance": 2.5 * atr,

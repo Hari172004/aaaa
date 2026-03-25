@@ -58,7 +58,7 @@ class DemoMode:
                       price: float, sl: float = 0.0, tp: float = 0.0,
                       comment: str = "demo") -> dict:
         pos = VirtualPosition(
-            id=uuid.uuid4().hex[:8],
+            id=uuid.uuid4().hex[:8],  # type: ignore
             symbol=symbol,
             direction=direction,
             volume=volume,
@@ -87,7 +87,7 @@ class DemoMode:
         else:
             pnl = (pos.open_price - close_price) * pos.volume * 100
 
-        pnl: float = round(float(pnl), 2)
+        pnl = round(float(pnl), 2)  # type: ignore
         self.account.balance += pnl
         self.account.equity   = self.account.balance
 
@@ -119,10 +119,11 @@ class DemoMode:
         )
         return trade_record
 
-    def modify_sl(self, position_id: str, new_sl: float) -> bool:
+    def modify_sl_tp(self, position_id: str, new_sl: float, new_tp: float) -> bool:
         pos = next((p for p in self.account.positions if p.id == position_id), None)
         if pos:
             pos.sl = new_sl
+            pos.tp = new_tp
             return True
         return False
 
@@ -174,14 +175,14 @@ class DemoMode:
     def get_account_info(self) -> dict:
         total = self.account.wins + self.account.losses
         return {
-            "balance":        round(float(self.account.balance), ndigits=2),
-            "equity":         round(float(self.account.equity), ndigits=2),
+            "balance":        round(float(self.account.balance), 2),  # type: ignore
+            "equity":         round(float(self.account.equity), 2),   # type: ignore
             "open_positions": len(self.account.positions),
-            "floating_pnl":   round(float(sum(p.pnl for p in self.account.positions)), ndigits=2),
+            "floating_pnl":   round(float(sum(p.pnl for p in self.account.positions)), 2), # type: ignore
             "total_trades":   total,
             "wins":           self.account.wins,
             "losses":         self.account.losses,
-            "win_rate":       round(float((self.account.wins / total * 100) if total > 0 else 0.0), ndigits=1),
+            "win_rate":       round(float((self.account.wins / total * 100) if total > 0 else 0.0), 1), # type: ignore
         }
 
     def get_open_positions(self) -> list:
@@ -194,7 +195,7 @@ class DemoMode:
                 "open_price": p.open_price,
                 "sl":         p.sl,
                 "tp":         p.tp,
-                "pnl":        round(float(p.pnl), ndigits=2),
+                "pnl":        round(float(p.pnl), 2),  # type: ignore
                 "open_time":  p.open_time.isoformat(),
             }
             for p in self.account.positions
@@ -203,7 +204,7 @@ class DemoMode:
     def get_trade_history(self, limit: int = 100) -> list[dict[str, Any]]:
         n: int = int(limit)
         history: list[dict[str, Any]] = self.account.history
-        return history[-n:]
+        return history[-n:] if n > 0 else []
 
     def get_last_close(self, symbol: str) -> Optional[float]:
         """

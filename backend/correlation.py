@@ -8,8 +8,8 @@ If DXY is spiking up -> Block XAUUSD BUYS.
 If DXY is dumping -> Block XAUUSD SELLS.
 """
 
-import pandas as pd
-from history_store import HistoryStore
+import pandas as pd # type: ignore
+from history_store import HistoryStore # type: ignore
 import logging
 
 logger = logging.getLogger("apexalgo.correlation")
@@ -29,14 +29,26 @@ class CorrelationEngine:
             return {"safe": True, "reason": f"No fixed correlation guard for {symbol}"}
 
         try:
-            # We use DX-Y.NYB which is the Yahoo Finance ticker for the US Dollar Index
-            dxy_candles = self.store.get_candles_json("DX-Y.NYB", "H4", limit=50)
+            # Detect a valid DXY symbol from common broker formats
+            dxy_sym = None
+            import MetaTrader5 as mt5 # type: ignore
+            terminal_info = mt5.terminal_info()
             
-            # If we don't have DXY data, we assume it's safe (fail-open) to avoid blocking the bot entirely
+            if terminal_info:
+                for s in ["DXY", "DX-Y", "USDIndex", "DX-Y.NYB"]:
+                    info = mt5.symbol_info(s)
+                    if info:
+                        dxy_sym = s
+                        break
+            
+            if not dxy_sym:
+                return {"safe": True, "reason": "DXY symbol not found on this broker, skipping guard."}
+
+            dxy_candles = self.store.get_candles_json(dxy_sym, "H4", limit=50)
+            
             if not dxy_candles or len(dxy_candles) < 20:
-                # Let's try to fetch it if it's missing
-                self.store.fetch_and_cache("DX-Y.NYB", "H4")
-                dxy_candles = self.store.get_candles_json("DX-Y.NYB", "H4", limit=50)
+                self.store.fetch_and_cache(dxy_sym, "H4")
+                dxy_candles = self.store.get_candles_json(dxy_sym, "H4", limit=50)
                 if not dxy_candles or len(dxy_candles) < 20:
                     return {"safe": True, "reason": "DXY Data unavailable, ignoring correlation guard."}
 

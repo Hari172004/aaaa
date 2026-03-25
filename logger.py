@@ -34,23 +34,32 @@ class AlertManager:
 
     # ── Telegram ──────────────────────────────────────────────
 
-    def send_telegram(self, message: str, is_alert: bool = False) -> bool:
+    def send_telegram(self, message: str, is_alert: bool = False, timeout: int = 5) -> bool:
         if not self.telegram_token or not self.telegram_chat_id:
             return False
-        prefix = "⚠️ *ApexAlgo Risk Alert*\n" if is_alert else "🚀 *ApexAlgo Signal*\n"
+            
+        # Support multiple IDs (comma-separated)
+        chat_ids = [cid.strip() for cid in str(self.telegram_chat_id).split(",") if cid.strip()]
+        if not chat_ids:
+            return False
+
+        prefix = "⚠️ <b>ApexAlgo Risk Alert</b>\n" if is_alert else "🚀 <b>ApexAlgo Signal</b>\n"
         text = prefix + message
         url  = TELEGRAM_API.format(token=self.telegram_token)
-        try:
-            resp = requests.post(url, json={
-                "chat_id":    self.telegram_chat_id,
-                "text":       text,
-                "parse_mode": "Markdown",
-            }, timeout=5)
-            resp.raise_for_status()
-            return True
-        except Exception as e:
-            logger.error(f"[Alert] Telegram error: {e}")
-            return False
+        
+        success = True
+        for chat_id in chat_ids:
+            try:
+                resp = requests.post(url, json={
+                    "chat_id":    chat_id,
+                    "text":       text,
+                    "parse_mode": "HTML",
+                }, timeout=timeout)
+                resp.raise_for_status()
+            except Exception as e:
+                logger.error(f"[Alert] Telegram error for CID {chat_id}: {e}")
+                success = False
+        return success
 
     # ── Email ─────────────────────────────────────────────────
 
@@ -84,31 +93,36 @@ class AlertManager:
         mode      = trade.get("mode", "")
         emoji     = "🟢" if direction == "BUY" else "🔴"
         msg = (
-            f"{emoji} *{direction} {symbol}*\n"
-            f"Strategy: `{strategy}` | Mode: `{mode}`\n"
-            f"Entry: `{price:.5f}`\n"
-            f"SL: `{sl:.5f}` | TP: `{tp:.5f}`\n"
-            f"Sentiment: `{sentiment}`\n"
+            f"{emoji} <b>{direction} {symbol}</b>\n"
+            f"Strategy: <code>{strategy}</code> | Mode: <code>{mode}</code>\n"
+            f"Entry: <code>{price:.5f}</code>\n"
+            f"SL: <code>{sl:.5f}</code> | TP: <code>{tp:.5f}</code>\n"
+            f"Sentiment: <code>{sentiment}</code>\n"
             f"🕐 {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
         )
-        self.send_telegram(msg)
+        # self.send_telegram(msg)
 
     def trade_closed(self, trade: dict):
-        symbol    = trade.get("symbol", "")
-        pnl       = trade.get("pnl", 0)
-        exit_rsn  = trade.get("exit_reason", "manual")
+        symbol    = trade.get("symbol", "N/A")
+        pnl       = trade.get("pnl", 0.0)
+        exit_rsn  = trade.get("exit_reason", "Exit")
+        ticket    = trade.get("ticket", "")
+        strategy  = trade.get("strategy", "N/A")
+        
         emoji     = "✅" if pnl >= 0 else "❌"
         msg = (
-            f"{emoji} *CLOSED {symbol}*\n"
-            f"PnL: `${pnl:+.2f}`\n"
-            f"Exit: `{exit_rsn}`\n"
+            f"{emoji} <b>Trade Closed #{ticket}</b>\n"
+            f"Asset: <code>{symbol}</code>\n"
+            f"PnL: <b>${pnl:+.2f}</b>\n"
+            f"Exit: <code>{exit_rsn}</code>\n"
+            f"Strategy: <code>{strategy}</code>\n"
             f"🕐 {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
         )
         self.send_telegram(msg)
 
     def risk_alert(self, message: str):
         logger.warning(f"[Alert] ⚠️ RISK: {message}")
-        self.send_telegram(message, is_alert=True)
+        # self.send_telegram(message, is_alert=True)
 
     # ── Supabase Logging ──────────────────────────────────────
 
@@ -164,15 +178,15 @@ class AlertManager:
         self.send_email(subject, body, recipient_email)
 
         tg_msg = (
-            f"📊 *Daily Report — {now}*\n"
-            f"Balance: `${stats.get('balance',0):,.2f}`\n"
-            f"Today PnL: `${stats.get('today_pnl',0):+.2f}`\n"
-            f"Win Rate: `{stats.get('win_rate_today',0):.1f}%`"
+            f"📊 <b>Daily Report — {now}</b>\n"
+            f"Balance: <code>${stats.get('balance',0):,.2f}</code>\n"
+            f"Today PnL: <code>${stats.get('today_pnl',0):+.2f}</code>\n"
+            f"Win Rate: <code>{stats.get('win_rate_today',0):.1f}%</code>"
         )
         if funded_report:
             tg_msg += (
-                f"\n🏦 *{funded_report.get('firm')}* | {funded_report.get('phase')}\n"
-                f"Progress: `{funded_report.get('profit_progress_pct',0):.1f}%` to target\n"
-                f"Drawdown: `{funded_report.get('drawdown_used_pct',0):.1f}%` used"
+                f"\n🏦 <b>{funded_report.get('firm')}</b> | {funded_report.get('phase')}\n"
+                f"Progress: <code>{funded_report.get('profit_progress_pct',0):.1f}%</code> to target\n"
+                f"Drawdown: <code>{funded_report.get('drawdown_used_pct',0):.1f}%</code> used"
             )
-        self.send_telegram(tg_msg)
+        # self.send_telegram(tg_msg)

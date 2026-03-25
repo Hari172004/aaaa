@@ -40,6 +40,19 @@ class RiskManager:
         self.breakeven_at_r = breakeven_at_r
         self.state = RiskState()
 
+    def set_dynamic_safety(self, balance: float):
+        """Adjust risk parameters based on account size."""
+        if balance < 50:
+            self.breakeven_at_r = 0.3  # Nano-Safety: Protect $10 accounts
+            self.max_daily_loss_pct = 20.0 # Increase limit for tiny accounts to avoid instant lock
+            logger.info(f"[RiskMgr] NANO balance ({balance}) detected. Breakeven=0.3R, MaxLoss=20%.")
+        elif balance < 500:
+            self.breakeven_at_r = 0.7 
+            self.max_daily_loss_pct = 10.0
+            logger.info(f"[RiskMgr] Low balance ({balance}) detected. Breakeven=0.7R, MaxLoss=10%.")
+        else:
+            self.breakeven_at_r = 1.0
+
     # ── Lot Size Calculation ───────────────────────────────────
 
     def calculate_lot_size(self, balance: float, sl_pips: float,
@@ -89,7 +102,8 @@ class RiskManager:
     # ── Trailing Stop Loss Logic ───────────────────────────────
 
     def should_update_sl(self, entry_price: float, current_price: float,
-                         current_sl: float, initial_sl: float, direction: str) -> tuple[bool, float]:
+                         current_sl: float, initial_sl: float, direction: str,
+                         override_breakeven_r: float = None) -> tuple[bool, float]:
         """
         Returns (should_move: bool, new_sl: float).
         Implements a Trailing Stop Loss. Activates when profit >= 1R (initial SL distance).
@@ -99,12 +113,14 @@ class RiskManager:
         if not initial_sl or initial_sl == entry_price:
             return False, current_sl
 
+        threshold = override_breakeven_r if override_breakeven_r is not None else self.breakeven_at_r
+
         if direction.upper() == "BUY":
             initial_risk = entry_price - initial_sl
             profit = current_price - entry_price
 
-            # Activation at 1R profit
-            if profit >= (initial_risk * self.breakeven_at_r):
+            # Activation at threshold * R profit
+            if profit >= (initial_risk * threshold):
                 # Trail by 1R distance behind current price
                 new_sl = current_price - initial_risk
                 new_sl = round(float(new_sl), 5) # type: ignore[arg-type]
@@ -116,7 +132,7 @@ class RiskManager:
             initial_risk = initial_sl - entry_price
             profit = entry_price - current_price
 
-            if profit >= (initial_risk * self.breakeven_at_r):
+            if profit >= (initial_risk * threshold):
                 new_sl = current_price + initial_risk
                 new_sl = round(float(new_sl), 5) # type: ignore[arg-type]
                 # Only move if it locks in more profit than current SL (lower is better for SL in SELL)

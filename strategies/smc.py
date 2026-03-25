@@ -107,13 +107,63 @@ class SMCEngine:
         }
 
     @staticmethod
+    def detect_liquidity_sweep(df: pd.DataFrame, window: int = 20) -> dict:
+        """
+        Detects if a 'Liquidity Sweep' has occurred.
+        A sweep is when price breaks a fractal high/low but closes back inside.
+        """
+        if len(df) < window + 1:
+            return {"bullish_sweep": False, "bearish_sweep": False}
+
+        lookback = df.iloc[-(window+1):-1]
+        range_high = lookback['high'].max()
+        range_low  = lookback['low'].min()
+        
+        last = df.iloc[-1]
+        
+        # Bullish Sweep: Price broke below previous lows but closed higher
+        bullish_sweep = last['low'] < range_low and last['close'] > range_low
+        
+        # Bearish Sweep: Price broke above previous highs but closed lower
+        bearish_sweep = last['high'] > range_high and last['close'] < range_high
+        
+        return {
+            "bullish_sweep": bullish_sweep,
+            "bearish_sweep": bearish_sweep,
+            "range_high": range_high,
+            "range_low": range_low
+        }
+
+    @staticmethod
+    def detect_displacement(df: pd.DataFrame) -> bool:
+        """
+        Detects 'Displacement' — a strong, impulsive move with high volume
+        and a large candle body relative to its wicks.
+        """
+        if len(df) < 5:
+            return False
+            
+        last = df.iloc[-1]
+        body = abs(last['close'] - last['open'])
+        range_total = last['high'] - last['low']
+        
+        # Displacement criteria:
+        # 1. Body is at least 70% of the total candle range (no long wicks)
+        # 2. Body is larger than the average of the last 10 bodies
+        avg_body = abs(df['close'] - df['open']).tail(10).mean()
+        
+        is_impulsive = body > (range_total * 0.7) and body > (avg_body * 1.5)
+        return is_impulsive
+
+    @staticmethod
     def get_smc_context(df: pd.DataFrame, current_price: float) -> dict:
         """
-        Returns boolean flags indicating if the current price is mitigating
-        an Order Block or sitting inside a Fair Value Gap.
+        Returns a comprehensive SMC context including OBs, FVGs, Sweeps and Displacement.
         """
         fvgs = SMCEngine.detect_fvg(df)
         obs = SMCEngine.detect_order_blocks(df)
+        sweeps = SMCEngine.detect_liquidity_sweep(df)
+        displacement = SMCEngine.detect_displacement(df)
 
         in_bullish_ob = any(ob['bottom'] <= current_price <= ob['top'] for ob in obs['bullish'])
         in_bearish_ob = any(ob['bottom'] <= current_price <= ob['top'] for ob in obs['bearish'])
@@ -124,6 +174,9 @@ class SMCEngine:
         return {
             "in_bull_zone": in_bullish_ob or in_bullish_fvg,
             "in_bear_zone": in_bearish_ob or in_bearish_fvg,
+            "bullish_sweep": sweeps["bullish_sweep"],
+            "bearish_sweep": sweeps["bearish_sweep"],
+            "displacement": displacement,
             "nearest_bull_ob": obs['bullish'][0] if obs['bullish'] else None,
             "nearest_bear_ob": obs['bearish'][0] if obs['bearish'] else None,
         }

@@ -112,8 +112,13 @@ class MT5Connector:
         }
 
     def get_open_positions(self, symbol: Optional[str] = None) -> list:
-        positions = mt5.positions_get(symbol=SYMBOL_MAP.get(symbol, symbol)) if symbol else mt5.positions_get()  # type: ignore
+        mt5_symbol = self.map_symbol(symbol) if symbol else None
+        positions = mt5.positions_get(symbol=mt5_symbol) if mt5_symbol else mt5.positions_get()  # type: ignore
         return [p._asdict() for p in positions] if positions else []
+
+    def map_symbol(self, symbol: str) -> str:
+        """Returns the broker-specific symbol name (e.g. 'GOLD' for 'XAUUSD')."""
+        return SYMBOL_MAP.get(symbol, symbol)
 
     def place_market_order(self, symbol: str, direction: str, volume: float,
                            sl: float = 0.0, tp: float = 0.0, comment: str = "apexalgo") -> dict:
@@ -139,6 +144,7 @@ class MT5Connector:
             "type_time":    mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
+        # ── Send directly to the broker (User explicitly requested no manual check) ─────
         result = mt5.order_send(request)  # type: ignore
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             logger.error(f"Order failed: [{result.retcode}] {result.comment}")
@@ -169,9 +175,37 @@ class MT5Connector:
         })
         return result.retcode == mt5.TRADE_RETCODE_DONE
 
-    def modify_sl(self, ticket: int, new_sl: float) -> bool:
-        result = mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": ticket, "sl": new_sl})  # type: ignore
-        return result.retcode == mt5.TRADE_RETCODE_DONE
+    def modify_sl_tp(self, ticket: int, sl: float, tp: float) -> bool:
+        """Modifies both SL and TP for an existing position. MT5 requires both to keep them."""
+        request = {
+            "action":   mt5.TRADE_ACTION_SLTP,
+            "position": ticket,
+            "sl":       float(sl),
+            "tp":       float(tp),
+        }
+        result = mt5.order_send(request)  # type: ignore
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            logger.error(f"[MT5] Modification failed: {result.comment}")
+            return False
+        return True
+
+    def get_closed_trade_info(self, ticket: int) -> dict:
+        """Fetches profit and closing reason for a specific ticket from history."""
+        # Look back 1 hour to find the closing deal
+        from datetime import datetime, timedelta
+        from_time = datetime.now() - timedelta(hours=1)
+        deals = mt5.history_deals_get(from_date=from_time, ticket=ticket) # type: ignore
+        
+        if deals and len(deals) > 0:
+            # Usually the last deal for a ticket is the closing one or contains the cumulative profit
+            deal = deals[-1]
+            return {
+                "profit": float(deal.profit),
+                "symbol": deal.symbol,
+                "magic":  deal.magic,
+                "reason": "TP/SL" if deal.reason in [mt5.DEAL_REASON_SL, mt5.DEAL_REASON_TP] else "Manual/Other" # type: ignore
+            }
+        return {}
 
     def pip_value(self, symbol: str, lot: float = 1.0) -> float:
         """Approximate pip value in account currency for 1 lot."""

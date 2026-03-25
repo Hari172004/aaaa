@@ -4,8 +4,8 @@ gold_indicators.py -- Full professional indicator suite for Gold (XAUUSD)
 Ichimoku, Supertrend, Parabolic SAR, Williams %R, CCI, Donchian, Heiken Ashi
 """
 
-import pandas as pd
-import numpy as np
+import pandas as pd # type: ignore
+import numpy as np  # type: ignore
 import logging
 
 logger = logging.getLogger("apexalgo.gold_indicators")
@@ -34,7 +34,7 @@ def calculate_gold_indicators(df: pd.DataFrame) -> pd.DataFrame:
     Apply the full institutional Gold indicator suite.
     Input df must have columns: open, high, low, close, volume
     """
-    if df.empty or len(df) < 200:
+    if df.empty or len(df) < 30:
         return df
 
     c = df["close"]
@@ -51,6 +51,10 @@ def calculate_gold_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["sma_50"]  = _sma(c, 50)
     df["sma_200"] = _sma(c, 200)
     df["golden_cross"] = (df["sma_50"] > df["sma_200"]).astype(int)
+    
+    # 55-MA Channel (High/Low)
+    df["ema_55_high"] = _ema(h, 55)
+    df["ema_55_low"]  = _ema(l, 55)
 
     # 3. RSI 14
     delta = c.diff()
@@ -135,11 +139,11 @@ def calculate_gold_indicators(df: pd.DataFrame) -> pd.DataFrame:
 # ── Parabolic SAR ─────────────────────────────────────────────────────────
 
 def _parabolic_sar(df: pd.DataFrame, af_start: float = 0.02, af_max: float = 0.2) -> pd.Series:
-    high  = df["high"].values
-    low   = df["low"].values
-    close = df["close"].values
+    high  = np.array(df["high"].values,   dtype=np.float64)
+    low   = np.array(df["low"].values,    dtype=np.float64)
+    close = np.array(df["close"].values,  dtype=np.float64)
     n     = len(close)
-    psar  = close.copy()
+    psar  = np.array(close.copy(), dtype=np.float64)
     bull  = True
     af    = af_start
     ep    = low[0]
@@ -148,7 +152,7 @@ def _parabolic_sar(df: pd.DataFrame, af_start: float = 0.02, af_max: float = 0.2
 
     for i in range(2, n):
         if bull:
-            psar[i] = psar[i - 1] + af * (hp - psar[i - 1])
+            psar[i] = float(psar[i - 1]) + float(af) * (float(hp) - float(psar[i - 1]))
             psar[i] = min(psar[i], low[i - 1], low[i - 2])
             if low[i] < psar[i]:
                 bull  = False
@@ -162,7 +166,7 @@ def _parabolic_sar(df: pd.DataFrame, af_start: float = 0.02, af_max: float = 0.2
                     af = min(af + af_start, af_max)
                 ep = hp
         else:
-            psar[i] = psar[i - 1] + af * (lp - psar[i - 1])
+            psar[i] = float(psar[i - 1]) + float(af) * (float(lp) - float(psar[i - 1]))
             psar[i] = max(psar[i], high[i - 1], high[i - 2])
             if high[i] > psar[i]:
                 bull  = True

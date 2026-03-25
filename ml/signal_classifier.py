@@ -7,11 +7,11 @@ if an incoming signal will be a WIN (1) or LOSS (0). Target Accuracy: > 68%.
 import os
 import logging
 import pickle
-import pandas as pd
+import pandas as pd # type: ignore
 from typing import Dict, Any, Tuple
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.ensemble import RandomForestClassifier # type: ignore
+from sklearn.model_selection import train_test_split # type: ignore
+from sklearn.metrics import accuracy_score # type: ignore
 
 logger = logging.getLogger("apexalgo.ml.classifier")
 
@@ -101,8 +101,8 @@ class SignalClassifier:
             return {"trade_allowed": True, "confidence": 1.0, "reason": "No Model"}
 
         try:
-            # Convert dictionary mapping to standard array ordered properly
-            X_live = [[current_features.get(f, 0.0) for f in self.features]]
+            # Convert dictionary mapping to DataFrame to avoid feature name warnings
+            X_live = pd.DataFrame([current_features], columns=self.features)
             
             # predict_proba returns array like [[prob_loss, prob_win]]
             probabilities = self.model.predict_proba(X_live)[0]

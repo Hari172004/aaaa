@@ -288,7 +288,8 @@ class FundedModeEngine:
 
     def check_can_trade(self, upcoming_news: Optional[list] = None,
                         open_positions: Optional[list] = None,
-                        estimated_trade_profit: float = 0) -> tuple[bool, str]:
+                        estimated_trade_profit: float = 0,
+                        skip_news: bool = False) -> tuple[bool, str]:
         """
         Master check — call before every trade.
         Returns: (can_trade: bool, reason: str)
@@ -309,7 +310,7 @@ class FundedModeEngine:
             return False, "Weekend trading prohibited by prop firm rules."
 
         # 2. News guard
-        if upcoming_news and self.is_near_news(upcoming_news):
+        if upcoming_news and not skip_news and self.is_near_news(upcoming_news):
             return False, "High-impact news window — trading paused."
 
         # 3. Daily loss limit

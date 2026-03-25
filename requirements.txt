@@ -1,7 +1,7 @@
 # ── Trading Bot Core & Utils ──────────────────────────────────
 MetaTrader5==5.0.45
 ccxt
-pandas
+pandas<2.2.0
 ta
 python-dotenv
 requests
@@ -9,8 +9,9 @@ textblob
 vaderSentiment
 yfinance
 backtrader
-numpy
+numpy<2
 scikit-learn
+websocket-client
 
 # ── Cloud Backend (FastAPI) ───────────────────────────────────
 fastapi

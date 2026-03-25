@@ -25,15 +25,17 @@ class BTCSentiment:
         self.cryptopanic_key = cryptopanic_key
 
     def fetch_rss_headlines(self) -> List[str]:
-        headlines = []
+        headlines: List[str] = []
         for url in self.RSS_FEEDS:
             try:
                 resp = requests.get(url, timeout=10, headers={'User-Agent': 'ApexAlgoBot/1.0'})
                 root = ET.fromstring(resp.content)
                 for item in root.findall(".//item"):
                     title = item.find("title")
-                    if title is not None and title.text is not None:
-                        headlines.append(title.text)
+                    if title is not None:
+                        text = title.text
+                        if text is not None:
+                            headlines.append(text)
             except Exception as e:
                 logger.warning(f"[Sentiment] RSS error ({url.split('/')[2]}): {e}")
         return headlines

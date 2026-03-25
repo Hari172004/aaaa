@@ -6,7 +6,7 @@ Rules: 2% cap, 15-pip min SL, 3 max open, daily loss limit, spread check,
 
 import logging
 from datetime import datetime, date, timezone
-from analysis.gold_sessions import is_lbma_fix_time
+from analysis.gold_sessions import is_lbma_fix_time  # type: ignore
 
 logger = logging.getLogger("apexalgo.gold_risk")
 
@@ -58,6 +58,13 @@ class GoldRiskManager:
     def __init__(self, config):
         self.config    = config
         self.funded    = getattr(config, "mode", "DEMO") == "FUNDED"
+        self.low_balance_mode = False
+
+    def set_dynamic_safety(self, balance: float):
+        """Adjust risk parameters based on account size."""
+        self.low_balance_mode = (balance < 500)
+        if self.low_balance_mode:
+            logger.info(f"[GoldRisk] Low balance ({balance}) detected. Risk restricted.")
 
     # ── Main check ────────────────────────────────────────────────────────
 
@@ -123,7 +130,7 @@ class GoldRiskManager:
             max_vol_funded = balance * (FUNDED_MAX_TRADE_PCT / 100) / (sl_val * 100)
             raw_vol = min(raw_vol, max_vol_funded)
 
-        volume = float(round(max(0.01, min(raw_vol, 10.0)), 2))
+        volume = float(round(max(0.01, min(raw_vol, 10.0)), 2))  # type: ignore
 
         return {
             "can_trade": True,

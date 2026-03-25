@@ -4,9 +4,10 @@ Detects: BOS, CHOCH, Order Blocks, FVGs, Liquidity Sweeps, Equal H/L,
          Asian Range, London Open breakout, Kill Zone timing.
 """
 
-import pandas as pd
-import numpy as np
+import pandas as pd # type: ignore
+import numpy as np  # type: ignore
 import logging
+from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger("apexalgo.gold_smc")
 
@@ -75,9 +76,9 @@ def detect_gold_smc(df: pd.DataFrame) -> dict:
         "trend":        trend,
         "bos":          bos,
         "choch":        choch,
-        "bull_obs":     bull_obs[:3],
-        "bear_obs":     bear_obs[:3],
-        "fvgs":         fvgs[:5],
+        "bull_obs":     list(bull_obs)[:3],  # type: ignore
+        "bear_obs":     list(bear_obs)[:3],  # type: ignore
+        "fvgs":         list(fvgs)[:5],      # type: ignore
         "sweeps":       sweeps,
         "equal_highs":  equal_highs,
         "equal_lows":   equal_lows,
@@ -123,8 +124,8 @@ def _detect_trend(sh: pd.DataFrame, sl: pd.DataFrame) -> str:
     if len(sh) < 2 or len(sl) < 2:
         return "UNKNOWN"
 
-    sh_vals = sh["high"].values
-    sl_vals = sl["low"].values
+    sh_vals = np.array(sh["high"].values, dtype=np.float64)
+    sl_vals = np.array(sl["low"].values,  dtype=np.float64)
 
     hh = sh_vals[-1] > sh_vals[-2]
     hl = sl_vals[-1] > sl_vals[-2]
@@ -185,7 +186,7 @@ def _find_fvgs(df: pd.DataFrame) -> list:
         elif high_2 < low_0:  # Bearish FVG
             fvgs.append({"type": "BEAR_FVG", "top": low_0, "bottom": high_2})
 
-    return fvgs[-8:] if len(fvgs) > 8 else fvgs
+    return list(fvgs)[-8:] if len(fvgs) > 8 else fvgs  # type: ignore
 
 
 # ── Liquidity Sweeps ──────────────────────────────────────────────────────
@@ -212,9 +213,9 @@ def _find_equal_levels(values: np.ndarray, tolerance: float = 0.05) -> list:
         return clusters
     for i in range(len(values)):
         for j in range(i + 1, len(values)):
-            if abs(values[i] - values[j]) <= tolerance:
-                clusters.append(float(round((values[i] + values[j]) / 2, 3)))
-    return list(set(clusters))[:5]
+            if abs(float(values[i]) - float(values[j])) <= tolerance: # type: ignore
+                clusters.append(float(round(float((values[i] + values[j]) / 2), 3))) # type: ignore
+    return list(set(clusters))[:5]  # type: ignore
 
 
 # ── Asian Range ───────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import json
 import logging
 import threading
 import time
+from typing import Optional
 import websocket # type: ignore
 
 logger = logging.getLogger("apexalgo.bybit")
@@ -22,36 +23,40 @@ class BybitConnector:
     def __init__(self, symbol: str = "BTCUSDT"):
         self.symbol = symbol.upper()
         self.ws_url = "wss://stream.bybit.com/v5/public/spot"
-        self.ws = None
+        self.ws: Optional[websocket.WebSocketApp] = None
         self.latest_tick = {}
         self._running = False
-        self._thread = None
+        self._thread: Optional[threading.Thread] = None
 
     def start(self):
         if self._running:
             return
         self._running = True
-        self._thread = threading.Thread(target=self._run_ws, daemon=True)
-        self._thread.start()
+        thread = threading.Thread(target=self._run_ws, daemon=True)
+        self._thread = thread
+        thread.start()
         logger.info(f"[Bybit] WebSocket started for {self.symbol}")
 
     def stop(self):
         self._running = False
-        if self.ws:
-            self.ws.close()
+        ws = self.ws
+        if ws is not None:
+            ws.close()
         logger.info("[Bybit] WebSocket stopped.")
 
     def _run_ws(self):
         while self._running:
             try:
-                self.ws = websocket.WebSocketApp(
+                ws = websocket.WebSocketApp(
                     self.ws_url,
                     on_open=self._on_open,
                     on_message=self._on_message,
                     on_error=self._on_error,
                     on_close=self._on_close
                 )
-                self.ws.run_forever()
+                self.ws = ws
+                if ws:
+                    ws.run_forever()
             except Exception as e:
                 logger.error(f"[Bybit] Connection error: {e}")
             

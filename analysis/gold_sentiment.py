@@ -60,14 +60,14 @@ def _fetch_rss(url: str) -> list:
 def _score_headline(headline: str) -> float:
     """Rule-based gold sentiment score for a single headline."""
     h = headline.lower()
-    score = 0.0
+    score: float = 0.0
     for kw in GOLD_KEYWORDS["bullish"]:
         if kw in h:
-            score += 1.0
+            score = score + 1.0  # type: ignore
     for kw in GOLD_KEYWORDS["bearish"]:
         if kw in h:
-            score -= 1.0
-    return score
+            score = score - 1.0  # type: ignore
+    return float(score)  # type: ignore
 
 
 def _time_weight(published: datetime) -> float:
@@ -124,7 +124,8 @@ def get_gold_news_sentiment() -> dict:
         weight       = _time_weight(item["published"])
         total_score += raw_score * weight
 
-    normalized = round(total_score / max(len(relevant), 1), 3)
+    avg_score = total_score / max(len(relevant), 1)
+    normalized = round(float(avg_score), 3)  # type: ignore
 
     if normalized > 0.5:
         label = "BULLISH"
@@ -133,7 +134,9 @@ def get_gold_news_sentiment() -> dict:
     else:
         label = "NEUTRAL"
 
-    top5_titles = [i["title"] for i in sorted(relevant, key=lambda x: x["published"], reverse=True)[:5]]
+    sorted_items = sorted(relevant, key=lambda x: x["published"], reverse=True)
+    top5_items = list(sorted_items)[:5]  # type: ignore
+    top5_titles = [i["title"] for i in top5_items]
 
     result = {
         "score":       normalized,

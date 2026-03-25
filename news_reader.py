@@ -8,11 +8,11 @@ Scores articles using VADER + TextBlob and returns Bullish/Bearish/Neutral.
 import os
 import time
 import logging
-import requests
+import requests # type: ignore
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from textblob import TextBlob
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer # type: ignore
+from textblob import TextBlob # type: ignore
 import threading
 
 logger = logging.getLogger("apexalgo.news")
