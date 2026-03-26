@@ -235,7 +235,7 @@ def _get_asian_range(df: pd.DataFrame) -> dict:
 
 # ── Price nearness helper ─────────────────────────────────────────────────
 
-def near_ob(price: float, obs: list, threshold_pips: float = 3.0) -> bool:
+def near_ob(price: float, obs: list, threshold_pips: float = 50.0) -> bool:
     """Check if current price is inside or near an Order Block."""
     for ob in obs:
         if ob["bottom"] - threshold_pips * 0.01 <= price <= ob["top"] + threshold_pips * 0.01:
@@ -243,11 +243,11 @@ def near_ob(price: float, obs: list, threshold_pips: float = 3.0) -> bool:
     return False
 
 
-def near_fvg(price: float, fvgs: list) -> bool:
-    """Check if current price is inside a Fair Value Gap."""
+def near_fvg(price: float, fvgs: list, threshold_pips: float = 30.0) -> bool:
+    """Check if current price is inside or very near a Fair Value Gap."""
     for fvg in fvgs:
-        bottom = fvg.get("bottom", 0)
-        top    = fvg.get("top", 0)
+        bottom = fvg.get("bottom", 0) - threshold_pips * 0.01
+        top    = fvg.get("top", 0) + threshold_pips * 0.01
         if bottom <= price <= top:
             return True
     return False

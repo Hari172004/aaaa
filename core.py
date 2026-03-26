@@ -80,7 +80,7 @@ STRATEGY_SCALP     = "SCALP"
 STRATEGY_SWING     = "SWING"
 STRATEGY_AUTO      = "AUTO"   # bot decides based on market
 
-ASSETS_XAUUSD = "XAUUSD"
+ASSETS_XAUUSD = os.getenv("GOLD_SYMBOL", "XAUUSD")
 ASSETS_BTC    = "BTCUSD"
 ASSETS_BOTH   = "BOTH"
 

@@ -53,8 +53,8 @@ class MT5Connector:
         if not all_symbols:
             return
 
-        gold_candidates = ["XAUUSD", "GOLD", "XAUUSD.a", "XAUUSDm", "XAUUSD.r", "XAUUSD.pro", "XAUUSD_micro"]
-        btc_candidates  = ["BTCUSD", "BITCOIN", "BTCUSD.a", "BTCUSDm", "BTCUSDT", "BTCUSD.pro", "BTCUSD_micro"]
+        gold_candidates = ["GAUUSD", "XAUUSD", "GOLD", "XAUUSD.a", "XAUUSDm", "XAUUSD.r", "XAUUSD.pro"]
+        btc_candidates  = ["BTCUSD", "BTCUSDT", "BITCOIN", "BTCUSD.a", "BTCUSDm", "BTCUSD.pro"]
 
         available_names = [s.name.upper() for s in all_symbols]
         raw_names = [s.name for s in all_symbols]
@@ -65,6 +65,7 @@ class MT5Connector:
                 exact_name = raw_names[available_names.index(cand.upper())]
                 mt5.symbol_select(exact_name, True)  # type: ignore
                 SYMBOL_MAP["XAUUSD"] = exact_name
+                print(f"[Broker] Universal Mapper: mapped XAUUSD -> {exact_name}")
                 logger.info(f"[Broker] Universal Mapper: mapped XAUUSD -> {exact_name}")
                 break
 
