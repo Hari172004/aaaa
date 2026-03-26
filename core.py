@@ -154,23 +154,22 @@ class AgniVBot:
         self._correlation = CorrelationEngine(self.history)
         self._smc         = SMCEngine() # SMCEngine doesn't take args
 
-        # ── BTC Components ──────────────────────────────────
-        self.btc_binance = BinanceConnector()
-        self.btc_bybit   = BybitConnector()
-        self.btc_scalp   = BTCScalpStrategy()
-        self.btc_swing   = BTCSwingStrategy()
-        self.btc_risk    = BTCRiskManager(max_risk_pct=config.risk_pct)
-        self.btc_alerts  = BTCAlerts(self.alerts)
+        # ── Asset-Specific Components ───────────────────────
+        if config.assets in (ASSETS_BTC, ASSETS_BOTH):
+            self.btc_binance = BinanceConnector()
+            self.btc_bybit   = BybitConnector()
+            self.btc_scalp   = BTCScalpStrategy()
+            self.btc_swing   = BTCSwingStrategy()
+            self.btc_risk    = BTCRiskManager(max_risk_pct=config.risk_pct)
+            self.btc_alerts  = BTCAlerts(self.alerts)
+            self.btc_ml      = SignalClassifier(symbol="BTCUSD")
 
-        # ── Gold Components ─────────────────────────────────
-        self.gold_scalp   = GoldScalpStrategy()
-        self.gold_swing   = GoldSwingStrategy()
-        self.gold_risk    = GoldRiskManager(config)
-        self.gold_alerts  = GoldAlerts(self.alerts)
-
-        # ── Machine Learning Filters ─────────────────────────
-        self.gold_ml = SignalClassifier(symbol="XAUUSD")
-        self.btc_ml  = SignalClassifier(symbol="BTCUSD")
+        if config.assets in (ASSETS_XAUUSD, ASSETS_BOTH):
+            self.gold_scalp   = GoldScalpStrategy()
+            self.gold_swing   = GoldSwingStrategy()
+            self.gold_risk    = GoldRiskManager(config)
+            self.gold_alerts  = GoldAlerts(self.alerts)
+            self.gold_ml      = SignalClassifier(symbol="XAUUSD")
 
         # Open positions tracking for breakeven (real mode)
         self._real_positions: dict = {}  # ticket → {sl, tp, entry, direction}
@@ -396,17 +395,19 @@ class AgniVBot:
             "mtf_confluence": signal_data.get("mtf_confluence", 3)
         }
         ml_model = self.btc_ml if symbol == ASSETS_BTC else self.gold_ml
-        
+
         # ML Ultra Mode: Higher threshold for low balance
-        
+
         # Update risk parameters dynamically
         self.risk_mgr.set_dynamic_safety(current_bal)
-        if hasattr(self, "gold_risk"):
+        if symbol == ASSETS_XAUUSD:
             self.gold_risk.set_dynamic_safety(current_bal)
+        elif symbol == ASSETS_BTC:
+            self.btc_risk.set_dynamic_safety(current_bal)
 
         # Initialize ai_approved
         ai_approved = False
-
+        
         if not self.config.use_ai_confirmation:
             logger.info(f"[Core] {symbol} | AI Confirmation BYPASSED per config.")
         else:
@@ -854,7 +855,11 @@ class AgniVBot:
         open_pos = self._get_open_positions()
         # Surface last known prices from history cache for the dashboard
         history_info: dict = {}
-        for sym in ["XAUUSD", "BTCUSD"]:
+        target_syms = []
+        if self.config.assets in (ASSETS_XAUUSD, ASSETS_BOTH): target_syms.append(ASSETS_XAUUSD)
+        if self.config.assets in (ASSETS_BTC, ASSETS_BOTH): target_syms.append(ASSETS_BTC)
+        
+        for sym in target_syms:
             lc = self.history.get_last_close(sym, "H1")
             if lc is not None:
                 history_info[sym] = {"last_close": lc}
