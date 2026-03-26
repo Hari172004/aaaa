@@ -5,7 +5,7 @@ Blocks trades unconditionally if spread spikes beyond tolerance (Gold <= 20 pips
 
 import logging
 
-logger = logging.getLogger("apexalgo.filters.spread")
+logger = logging.getLogger("agniv.filters.spread")
 
 class SpreadFilter:
     def __init__(self, gold_max_pips: int = 20, btc_max_pct: float = 0.05):

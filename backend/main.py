@@ -1,5 +1,5 @@
 """
-main.py — ApexAlgo FastAPI Backend
+main.py — Agni-V FastAPI Backend
 ======================================
 Runs as the cloud API on Oracle Cloud VPS.
 All Android app and web dashboard routes are here.
@@ -30,13 +30,13 @@ from history_store     import HistoryStore, SYMBOL_MAP, TIMEFRAME_MAP
 _history_store = HistoryStore()
 
 load_dotenv()
-logger = logging.getLogger("apexalgo.api")
+logger = logging.getLogger("agniv.api")
 
 # ── App Setup ─────────────────────────────────────────────────
 
 app = FastAPI(
-    title="ApexAlgo API",
-    description="Cloud backend for the ApexAlgo SaaS trading bot platform.",
+    title="Agni-V API",
+    description="Cloud backend for the Agni-V SaaS trading bot platform.",
     version="1.0.0",
 )
 
@@ -49,21 +49,21 @@ app.add_middleware(
 )
 
 # Global bot registry: one bot instance per user session
-_bot_registry: dict = {}   # user_id → ApexAlgoBot
+_bot_registry: dict = {}   # user_id → AgniVBot
 _bot_threads:  dict = {}   # user_id → Thread
 
 
 @app.on_event("startup")
 async def startup():
     init_firebase()
-    logger.info("[API] ApexAlgo API started.")
+    logger.info("[API] Agni-V API started.")
 
 
 # ── Health ────────────────────────────────────────────────────
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "time": datetime.utcnow().isoformat(), "service": "apexalgo-api"}
+    return {"status": "ok", "time": datetime.utcnow().isoformat(), "service": "agniv-api"}
 
 
 # ── Auth / License ────────────────────────────────────────────
@@ -85,7 +85,7 @@ def start_bot(req: BotStartRequest, user: dict = Depends(get_current_user)):
     plan = require_valid_license(user=user)
 
     # Import here to avoid circular at module level
-    from core import ApexAlgoBot, BotConfig, MODE_DEMO, MODE_FUNDED
+    from core import AgniVBot, BotConfig, MODE_DEMO, MODE_FUNDED
 
     # Funded mode requires Pro or Elite
     if req.config.mode and req.config.mode.value == "FUNDED":
@@ -98,7 +98,7 @@ def start_bot(req: BotStartRequest, user: dict = Depends(get_current_user)):
     # Map enum values to strings
     cfg_str = {k: getattr(v, "value", v) for k, v in cfg_kwargs.items()}
 
-    bot = ApexAlgoBot(BotConfig(**cfg_str))
+    bot = AgniVBot(BotConfig(**cfg_str))
     _bot_registry[uid] = bot
 
     thread = threading.Thread(target=bot.start, daemon=True, name=f"bot-{uid[:8]}")
@@ -260,7 +260,7 @@ def funded_report(user: dict = Depends(get_current_user)):
 
 @app.post("/subscribe/checkout")
 def start_checkout(req: CheckoutRequest, user: dict = Depends(get_current_user)):
-    base = os.getenv("FRONTEND_URL", "https://apexalgo.vercel.app")
+    base = os.getenv("FRONTEND_URL", "https://agniv.vercel.app")
     return create_checkout_session(
         user_id     = user["uid"],
         plan        = req.plan.value,

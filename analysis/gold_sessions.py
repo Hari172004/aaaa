@@ -5,7 +5,7 @@ gold_sessions.py -- Gold session detector with Kill Zone timing and LBMA avoidan
 from datetime import datetime, timezone
 import logging
 
-logger = logging.getLogger("apexalgo.gold_sessions")
+logger = logging.getLogger("agniv.gold_sessions")
 
 # All times in UTC (equivalent to GMT)
 SESSIONS = {

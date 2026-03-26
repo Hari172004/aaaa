@@ -6,7 +6,7 @@ Generates a weighted score out of 100 for every incoming trade signal.
 import logging
 from typing import Dict, Any
 
-logger = logging.getLogger("apexalgo.filters.scorer")
+logger = logging.getLogger("agniv.filters.scorer")
 
 class SignalScorer:
     """

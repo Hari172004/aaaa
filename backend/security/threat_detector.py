@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Optional, Dict
 from cachetools import TTLCache
 
-logger = logging.getLogger("apexalgo.threats")
+logger = logging.getLogger("agniv.threats")
 
 # Simple transient cache to prevent alert spamming (e.g. 1 alert per hour per anomaly type)
 ALERT_CACHE = TTLCache(maxsize=1000, ttl=3600)  

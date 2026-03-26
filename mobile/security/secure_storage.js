@@ -67,8 +67,8 @@ export async function deleteSecureItem(key) {
  * Called immediately upon `Auth.execute_logout()` success.
  */
 export async function wipeSessionData() {
-    await deleteSecureItem('apexalgo_access_token');
-    await deleteSecureItem('apexalgo_refresh_token');
-    await deleteSecureItem('apexalgo_session_id');
+    await deleteSecureItem('agniv_access_token');
+    await deleteSecureItem('agniv_refresh_token');
+    await deleteSecureItem('agniv_session_id');
     console.log('[VAULT] Complete session wipe executed.');
 }

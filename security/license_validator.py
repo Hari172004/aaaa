@@ -1,6 +1,6 @@
 """
 license_validator.py — Continuous JWT License Check
-Verifies the ApexAlgo bot license every 60 seconds against the backend API.
+Verifies the Agni-V bot license every 60 seconds against the backend API.
 """
 
 import threading
@@ -15,13 +15,13 @@ from typing import Optional
 # We dynamically import hardware lock to inject HWID into requests
 from security.hardware_lock import hw_lock
 
-logger = logging.getLogger("apexalgo.license")
+logger = logging.getLogger("agniv.license")
 
 class LicenseValidator:
-    def __init__(self, backend_url: str = "https://api.apexalgo.com"):
+    def __init__(self, backend_url: str = "https://api.agniv.com"):
         self.backend_url = backend_url
-        self.license_key: Optional[str] = os.getenv("APEXALGO_LICENSE_KEY")
-        self.jwt_public_key: Optional[str] = os.getenv("APEXALGO_PUBLIC_KEY")
+        self.license_key: Optional[str] = os.getenv("AGNIV_LICENSE_KEY")
+        self.jwt_public_key: Optional[str] = os.getenv("AGNIV_PUBLIC_KEY")
         
         self._stop_event = threading.Event()
         self._monitor_thread = None
@@ -39,7 +39,7 @@ class LicenseValidator:
             payload = jwt.decode(self.license_key, self.jwt_public_key, algorithms=["RS256"])
             return payload
         except jwt.ExpiredSignatureError:
-            logger.critical("[LICENSE] Your ApexAlgo license has expired!")
+            logger.critical("[LICENSE] Your Agni-V license has expired!")
             sys.exit(1)
         except jwt.InvalidSignatureError:
             logger.critical("[LICENSE] Invalid license signature. Forgery detected.")
@@ -99,7 +99,7 @@ class LicenseValidator:
     def start(self):
         """Starts the background verification thread."""
         if not self.license_key:
-            logger.critical("[LICENSE] No APEXALGO_LICENSE_KEY found in .env file.")
+            logger.critical("[LICENSE] No AGNIV_LICENSE_KEY found in .env file.")
             sys.exit(1)
             
         # Initial boot check

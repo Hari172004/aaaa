@@ -9,7 +9,7 @@ import requests # type: ignore
 import logging
 import time
 
-logger = logging.getLogger("apexalgo.onchain")
+logger = logging.getLogger("agniv.onchain")
 
 class BTCOnChain:
     """Reads on-chain metrics for BTC."""

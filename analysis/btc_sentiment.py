@@ -10,7 +10,7 @@ import logging
 import xml.etree.ElementTree as ET
 from typing import List
 
-logger = logging.getLogger("apexalgo.sentiment")
+logger = logging.getLogger("agniv.sentiment")
 
 class BTCSentiment:
     """Aggregates BTC sentiment across various platforms."""
@@ -28,7 +28,7 @@ class BTCSentiment:
         headlines: List[str] = []
         for url in self.RSS_FEEDS:
             try:
-                resp = requests.get(url, timeout=10, headers={'User-Agent': 'ApexAlgoBot/1.0'})
+                resp = requests.get(url, timeout=10, headers={'User-Agent': 'AgniVBot/1.0'})
                 root = ET.fromstring(resp.content)
                 for item in root.findall(".//item"):
                     title = item.find("title")

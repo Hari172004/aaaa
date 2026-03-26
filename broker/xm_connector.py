@@ -6,7 +6,7 @@ import logging
 import requests
 from datetime import datetime
 
-logger = logging.getLogger("apexalgo.xm")
+logger = logging.getLogger("agniv.xm")
 
 class XMConnector:
     """

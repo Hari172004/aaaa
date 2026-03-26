@@ -13,7 +13,7 @@ from sklearn.ensemble import RandomForestClassifier # type: ignore
 from sklearn.model_selection import train_test_split # type: ignore
 from sklearn.metrics import accuracy_score # type: ignore
 
-logger = logging.getLogger("apexalgo.ml.classifier")
+logger = logging.getLogger("agniv.ml.classifier")
 
 
 

@@ -11,7 +11,7 @@ from analysis.gold_indicators import calculate_gold_indicators # type: ignore
 from analysis.gold_market_structure import detect_gold_smc, near_ob, near_fvg # type: ignore
 from analysis.gold_sessions import is_gold_scalp_time, get_current_gold_session # type: ignore
 
-logger = logging.getLogger("apexalgo.gold_scalp")
+logger = logging.getLogger("agniv.gold_scalp")
 
 MAX_SCALPS_PER_SESSION = 5
 
@@ -74,10 +74,13 @@ class GoldScalpStrategy:
         
         atr   = float(last.get("atr", 0))
         
-        # 4. Filter: 13:00 - 17:00 GMT (NY Session) for Sniper precision
-        is_ny_kill_zone = 13 <= datetime.now(timezone.utc).hour <= 17
-        if is_sniper and not is_ny_kill_zone:
-             return {**empty, "reason": "Sniper: Outside NY High-Liquidity Window (13-17 GMT)"}
+        # 4. Filter: London (7-10 GMT) & NY (13-17 GMT) for Sniper precision
+        now_hour = datetime.now(timezone.utc).hour
+        is_london = 7 <= now_hour <= 10
+        is_ny     = 13 <= now_hour <= 17
+        
+        if is_sniper and not (is_london or is_ny):
+             return {**empty, "reason": "Sniper: Outside High-Liquidity Windows (London/NY)"}
 
         # 5. Momentum: 50 EMA + RSI (M1/M5)
         ema50 = float(last.get("ema_50", 0))

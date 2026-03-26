@@ -8,7 +8,7 @@ import os
 import hashlib
 import logging
 
-logger = logging.getLogger("apexalgo.tampering")
+logger = logging.getLogger("agniv.tampering")
 
 class AntiTamper:
     def __init__(self):

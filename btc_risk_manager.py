@@ -11,7 +11,7 @@ Encapsulates all risk logic for Bitcoin trading.
 import logging
 import os
 
-logger = logging.getLogger("apexalgo.btc_risk")
+logger = logging.getLogger("agniv.btc_risk")
 
 class BTCRiskManager:
     """Manages risk for BTC trades."""

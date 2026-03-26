@@ -7,7 +7,7 @@ Alert types: Signal, DXY warning, News pause, Kill Zone open,
 import logging
 from datetime import datetime, timezone, date
 
-logger = logging.getLogger("apexalgo.gold_alerts")
+logger = logging.getLogger("agniv.gold_alerts")
 
 EMOJI = {
     "gold":         "🥇",
@@ -42,7 +42,7 @@ class GoldAlerts:
         direction_emoji = EMOJI["buy"] if signal == "BUY" else EMOJI["sell"]
         action_line     = f"{direction_emoji} <b>{symbol} {strategy} — {signal}</b>"
         msg = (
-            f"🥇 <b>ApexAlgo Gold Signal</b>\n"
+            f"🥇 <b>Agni-V Gold Signal</b>\n"
             f"{'─' * 30}\n"
             f"{action_line}\n\n"
             f"📝 <i>{reason}</i>\n"
@@ -88,7 +88,7 @@ class GoldAlerts:
         """Fire when news blackout window ends."""
         msg = (
             f"✅ <b>Gold Trading Resumed</b> — <code>{event_name}</code> data released.\n"
-            f"ApexAlgo scanning gold markets again."
+            f"Agni-V scanning gold markets again."
         )
         self._send(msg)
 
@@ -109,7 +109,7 @@ class GoldAlerts:
         session_display = "London" if session == "LONDON" else "New York"
         msg = (
             f"{EMOJI['lightning']} <b>{session_display} Kill Zone Open</b>\n"
-            f"ApexAlgo scanning gold opportunities.\n"
+            f"Agni-V scanning gold opportunities.\n"
             f"🕐 <code>{datetime.now(timezone.utc).strftime('%H:%M')}</code> UTC"
         )
         self._send(msg, alert=True)
@@ -202,7 +202,7 @@ class GoldAlerts:
         """End-of-day summary report."""
         pnl_emoji = "📈" if pnl >= 0 else "📉"
         msg = (
-            f"{EMOJI['gold']} <b>ApexAlgo Gold Daily Report {EMOJI['gold']}</b>\n"
+            f"{EMOJI['gold']} <b>Agni-V Gold Daily Report {EMOJI['gold']}</b>\n"
             f"{'─' * 32}\n"
             f"📅 Date:       <code>{date.today().isoformat()}</code>\n"
             f"{pnl_emoji} PnL:        <code>{'+'if pnl>=0 else ''}{pnl:.2f}</code> USD\n"

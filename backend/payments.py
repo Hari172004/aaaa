@@ -1,5 +1,5 @@
 """
-payments.py — Stripe Subscription Integration for ApexAlgo
+payments.py — Stripe Subscription Integration for Agni-V
 =============================================================
 Handles: checkout session creation, webhook processing, license generation.
 Plans:
@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, Request
 from backend.database import create_license, deactivate_license, upsert_user
 
-logger = logging.getLogger("apexalgo.payments")
+logger = logging.getLogger("agniv.payments")
 
 PLAN_PRICES = {
     "STARTER": os.getenv("STRIPE_PRICE_STARTER", "price_starter_id"),
@@ -65,7 +65,7 @@ def create_checkout_session(user_id: str, plan: str, email: str,
 
 
 def generate_license_key() -> str:
-    """Generate a unique ApexAlgo license key."""
+    """Generate a unique Agni-V license key."""
     chars: list = list(secrets.token_hex(16).upper())
     a = "".join(chars[0:4])   # type: ignore[misc]
     b = "".join(chars[4:8])   # type: ignore[misc]

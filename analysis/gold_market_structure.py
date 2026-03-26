@@ -9,7 +9,7 @@ import numpy as np  # type: ignore
 import logging
 from typing import List, Dict, Any, Optional
 
-logger = logging.getLogger("apexalgo.gold_smc")
+logger = logging.getLogger("agniv.gold_smc")
 
 
 # ── Swing Point Detection ─────────────────────────────────────────────────

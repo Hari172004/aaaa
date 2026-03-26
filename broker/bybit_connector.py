@@ -12,7 +12,7 @@ import time
 from typing import Optional
 import websocket # type: ignore
 
-logger = logging.getLogger("apexalgo.bybit")
+logger = logging.getLogger("agniv.bybit")
 
 class BybitConnector:
     """

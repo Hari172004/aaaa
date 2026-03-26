@@ -8,7 +8,7 @@ import pandas as pd # type: ignore
 import numpy as np  # type: ignore
 import logging
 
-logger = logging.getLogger("apexalgo.gold_indicators")
+logger = logging.getLogger("agniv.gold_indicators")
 
 
 # ── Core Indicators ────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ def calculate_gold_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["bb_upper"] = mid + 2 * std
     df["bb_lower"] = mid - 2 * std
     df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / mid.replace(0, np.nan)
-    df["bb_squeeze"] = (df["bb_width"] < df["bb_width"].rolling(50).mean() * 0.8)
+    df["bb_squeeze"] = (df["bb_width"] < df["bb_width"].rolling(50).mean() * 0.7)
 
     # 6. ATR 14 — stop loss sizing
     df["atr"] = _atr(df, 14)

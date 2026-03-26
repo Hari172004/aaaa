@@ -1,5 +1,5 @@
 """
-core.py — ApexAlgo Main Bot Engine
+core.py — Agni-V Main Bot Engine
 ======================================
 This is the central orchestrator. It:
   - Manages three trading modes: Demo, Real, Funded
@@ -10,8 +10,8 @@ This is the central orchestrator. It:
   - Handles breakeven management and daily resets
 
 Usage:
-    from core import ApexAlgoBot
-    bot = ApexAlgoBot(config)
+    from core import AgniVBot
+    bot = AgniVBot(config)
     bot.start()
 """
 
@@ -64,10 +64,10 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("apexalgo_bot.log", encoding="utf-8"),
+        logging.FileHandler("agniv_bot.log", encoding="utf-8"),
     ],
 )
-logger = logging.getLogger("apexalgo.core")
+logger = logging.getLogger("agniv.core")
 
 # ──────────────────────────────────────────────────────────────
 # Mode constants
@@ -118,9 +118,9 @@ class BotConfig:
                 setattr(self, k, v)
 
 
-class ApexAlgoBot:
+class AgniVBot:
     """
-    The main ApexAlgo trading bot.
+    The main Agni-V trading bot.
     Thread-safe — mode and settings can be updated from the API at runtime.
     """
 
@@ -175,7 +175,7 @@ class ApexAlgoBot:
         # Open positions tracking for breakeven (real mode)
         self._real_positions: dict = {}  # ticket → {sl, tp, entry, direction}
 
-        logger.info(f"[Core] ApexAlgo Bot initialised | Mode={config.mode} | Assets={config.assets}")
+        logger.info(f"[Core] Agni-V Bot initialised | Mode={config.mode} | Assets={config.assets}")
 
     def _play_sound(self, action: str):
         """Play system sounds or custom WAV files for trade events."""
@@ -202,14 +202,14 @@ class ApexAlgoBot:
 
     def test_telegram(self):
         """Send a test message to all configured chat IDs."""
-        msg = "🧪 <b>ApexAlgo Telegram Test</b>\nYour connection is active and ready for signals! 🚀🎯"
+        msg = "🧪 <b>Agni-V Telegram Test</b>\nYour connection is active and ready for signals! 🚀🎯"
         return self.alerts.send_telegram(msg)
 
     # ── Startup ───────────────────────────────────────────────
 
     def start(self):
         """Starts the bot components and main loop."""
-        logger.info("[Core] Starting ApexAlgo Bot...")
+        logger.info("[Core] Starting Agni-V Bot...")
         self._setup_mode(self.config)
         
         # Start BTC Connectors if needed
@@ -249,7 +249,7 @@ class ApexAlgoBot:
         # 2. Notify user bot is OFF (Low Priority, don't block)
         def _silent_notify():
             try:
-                self.alerts.send_telegram("🔴 <b>ApexAlgo Bot OFFLINE</b>\nBot shutting down safely. 👋", timeout=2)
+                self.alerts.send_telegram("🔴 <b>Agni-V Bot OFFLINE</b>\nBot shutting down safely. 👋", timeout=2)
             except:
                 pass
         
@@ -658,7 +658,7 @@ class ApexAlgoBot:
 
         if self.config.mode == MODE_DEMO:
             result = self.demo_account.open_position(
-                symbol, direction, volume, entry, sl, tp, comment="apexalgo_demo"
+                symbol, direction, volume, entry, sl, tp, comment="agniv_demo"
             )
         elif self.config.mode in (MODE_REAL, MODE_FUNDED):
             result = self.mt5.place_market_order(symbol, direction, volume, sl, tp)
@@ -866,5 +866,5 @@ if __name__ == "__main__":
         ccxt_secret  = os.getenv("BINANCE_SECRET", ""),
         ccxt_testnet = os.getenv("CCXT_TESTNET", "true").lower() == "true",
     )
-    bot = ApexAlgoBot(cfg)
+    bot = AgniVBot(cfg)
     bot.start()

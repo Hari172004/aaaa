@@ -14,7 +14,7 @@ from analysis.btc_indicators import BTCIndicators # type: ignore
 from analysis.btc_market_structure import BTCMarketStructure # type: ignore
 from analysis.btc_onchain import BTCOnChain # type: ignore
 
-logger = logging.getLogger("apexalgo.btc_swing")
+logger = logging.getLogger("agniv.btc_swing")
 
 class BTCSwingStrategy:
     """Swing trading for BTC."""

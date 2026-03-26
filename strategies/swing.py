@@ -11,7 +11,7 @@ import pandas as pd # type: ignore
 import ta # type: ignore
 from strategies.smc import SMCEngine # type: ignore
 
-logger = logging.getLogger("apexalgo.swing")
+logger = logging.getLogger("agniv.swing")
 
 
 class SwingStrategy:

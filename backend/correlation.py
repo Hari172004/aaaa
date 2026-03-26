@@ -12,7 +12,7 @@ import pandas as pd # type: ignore
 from history_store import HistoryStore # type: ignore
 import logging
 
-logger = logging.getLogger("apexalgo.correlation")
+logger = logging.getLogger("agniv.correlation")
 
 class CorrelationEngine:
     def __init__(self, history_store: HistoryStore):

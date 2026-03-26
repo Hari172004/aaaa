@@ -1,4 +1,4 @@
-# 🚀 ApexAlgo Trading Bot Platform
+# 🚀 Agni-V Trading Bot Platform
 
 > **Trade Above the Market** — AI-powered SaaS trading bot with prop firm support, live signals, and global deployment.
 
@@ -195,7 +195,7 @@ The bot will:
 
 ---
 
-## 💳 ApexAlgo Subscription Plans
+## 💳 Agni-V Subscription Plans
 
 | Plan    | Price  | Assets       | Modes                |
 | :------ | :----- | :----------- | :------------------- |

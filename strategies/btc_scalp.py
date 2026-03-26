@@ -14,7 +14,7 @@ import pandas as pd # type: ignore
 from analysis.btc_indicators import BTCIndicators # type: ignore
 from analysis.btc_market_structure import BTCMarketStructure # type: ignore
 
-logger = logging.getLogger("apexalgo.btc_scalp")
+logger = logging.getLogger("agniv.btc_scalp")
 
 class BTCScalpStrategy:
     """Fast scalping for BTC."""
@@ -63,17 +63,20 @@ class BTCScalpStrategy:
         if not (all(col in row for col in required) and all(col in prev_row for col in required)):
              return {**empty, "reason": "BTCScalp: Waiting for indicators to stabilise"}
 
-        # 3. Filter: 13:00 - 17:00 GMT (NY Session) for Sniper precision
-        is_ny_kill_zone = 13 <= datetime.now(timezone.utc).hour <= 17
-        if is_sniper and not is_ny_kill_zone:
-             return {**empty, "reason": "Sniper BTC: Outside High-Liquidity Window (13-17 GMT)"}
+        # 3. Filter: London (7-10 GMT) & NY (13-17 GMT) for Sniper precision
+        now_hour = datetime.now(timezone.utc).hour
+        is_london = 7 <= now_hour <= 10
+        is_ny     = 13 <= now_hour <= 17
+        
+        if is_sniper and not (is_london or is_ny):
+             return {**empty, "reason": "Sniper BTC: Outside High-Liquidity Windows (London/NY)"}
 
         # 4. Momentum: 50 EMA + RSI (M1/M5)
         ema50 = float(row.get("ema_50", 0))
         rsi_bullish = rsi > 50 and prev_row.get("rsi", 50) <= 50
         rsi_bearish = rsi < 50 and prev_row.get("rsi", 50) >= 50
-        momentum_scalp_up = close > ema50 and rsi_bullish
-        momentum_scalp_down = close < ema50 and rsi_bearish
+        momentum_scalp_up = live_close_val > ema50 and rsi_bullish
+        momentum_scalp_down = live_close_val < ema50 and rsi_bearish
 
         vol_avg = df["volume"].tail(20).mean()
         rvol = row["volume"] / vol_avg if vol_avg > 0 else 1.0

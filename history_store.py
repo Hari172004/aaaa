@@ -1,5 +1,5 @@
 """
-history_store.py — ApexAlgo Historical OHLCV Cache
+history_store.py — Agni-V Historical OHLCV Cache
 ======================================================
 Fetches candle data from yfinance and caches it in a local SQLite database.
 Supports all trading symbols and timeframes used by the bot.
@@ -26,7 +26,7 @@ from typing import Optional
 
 import pandas as pd  # type: ignore
 
-logger = logging.getLogger("apexalgo.history")
+logger = logging.getLogger("agniv.history")
 
 # ──────────────────────────────────────────────────────────────
 # Constants

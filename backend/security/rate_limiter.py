@@ -10,7 +10,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-logger = logging.getLogger("apexalgo.ratelimit")
+logger = logging.getLogger("agniv.ratelimit")
 
 # In-memory dictionary tracking repeated abusers (in production, use Redis)
 ABUSE_RECORDS = {}

@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, time as dtime
 import pytz
 
-logger = logging.getLogger("apexalgo.filters.session")
+logger = logging.getLogger("agniv.filters.session")
 
 class SessionFilter:
     def __init__(self):

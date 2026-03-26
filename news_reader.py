@@ -15,7 +15,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer # type: ign
 from textblob import TextBlob # type: ignore
 import threading
 
-logger = logging.getLogger("apexalgo.news")
+logger = logging.getLogger("agniv.news")
 
 FOREXFACTORY_RSS = "https://www.forexfactory.com/ff_calendar_thisweek.xml"
 NEWSAPI_ENDPOINT = "https://newsapi.org/v2/everything"

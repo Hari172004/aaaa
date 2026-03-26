@@ -1,5 +1,5 @@
 """
-funded_mode.py — Prop Firm Rule Engine for ApexAlgo
+funded_mode.py — Prop Firm Rule Engine for Agni-V
 =======================================================
 Enforces all prop firm rules from FTMO, MyForexFunds, The5ers, Apex, TrueForex.
 Supports: Phase 1 (Challenge), Phase 2 (Verification), Live Funded.
@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 import json
 
-logger = logging.getLogger("apexalgo.funded_mode")
+logger = logging.getLogger("agniv.funded_mode")
 
 
 def _r2(x: float) -> float:

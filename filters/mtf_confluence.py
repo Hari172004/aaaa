@@ -6,7 +6,7 @@ Validates execution alignment across D1, H4, H1, M15, M5 timeframes.
 import logging
 from typing import Dict, Any, List
 
-logger = logging.getLogger("apexalgo.filters.mtf")
+logger = logging.getLogger("agniv.filters.mtf")
 
 class MTFConfluenceFilter:
     def __init__(self):

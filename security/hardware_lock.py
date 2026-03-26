@@ -8,7 +8,7 @@ import platform
 import hashlib
 import logging
 
-logger = logging.getLogger("apexalgo.hardware")
+logger = logging.getLogger("agniv.hardware")
 
 class HardwareLock:
     def __init__(self):

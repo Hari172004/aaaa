@@ -1,5 +1,5 @@
 """
-backtester.py — ApexAlgo Backtrader Module
+backtester.py — Agni-V Backtrader Module
 =============================================
 Tests both Scalping and Swing strategies on historical XAUUSD and BTC data.
 Simulates funded account rules during backtesting.
@@ -13,7 +13,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 
-logger = logging.getLogger("apexalgo.backtest")
+logger = logging.getLogger("agniv.backtest")
 
 
 # ──────────────────────────────────────────────────────────────

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ApexAlgo — Trade Above the Market</title>
-  <meta name="description" content="ApexAlgo is an AI-powered SaaS trading bot with prop firm support, live signals, and automated risk management." />
+  <title>Agni-V — Trade Above the Market</title>
+  <meta name="description" content="Agni-V is an AI-powered SaaS trading bot with prop firm support, live signals, and automated risk management." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -34,6 +34,7 @@
       display: flex; align-items: center; justify-content: space-between;
       padding: 1.2rem 5%;
       border-bottom: 1px solid var(--border);
+      -webkit-backdrop-filter: blur(12px);
       backdrop-filter: blur(12px);
       position: sticky; top: 0; z-index: 100;
       background: rgba(10,10,15,0.85);
@@ -168,6 +169,20 @@
       text-align: center; color: var(--muted); font-size: 0.85rem;
     }
     footer a { color: var(--gold); text-decoration: none; }
+    
+    /* Utility & Refactored Inline Styles */
+    .mt-04 { margin-top: 0.4rem; }
+    .mt-05 { margin-top: 0.5rem; }
+    .fs-075 { font-size: 0.75rem; }
+    .fs-085 { font-size: 0.85rem; }
+    .text-muted { color: var(--muted); }
+    .text-gold { color: var(--gold); }
+    
+    .w-62 { width: 62% !important; }
+    .w-45 { width: 45% !important; }
+    .w-78 { width: 78% !important; }
+    .w-55 { width: 55% !important; }
+    .w-30 { width: 30% !important; }
   </style>
 </head>
 <body>
@@ -188,7 +203,7 @@
 <section class="hero">
   <div class="badge">🚀 AI-Powered Trading Bot — Prop Firm Ready</div>
   <h1>Trade <span class="accent">Above</span><br/>the Market.</h1>
-  <p>ApexAlgo runs 24/7 on XAUUSD and Bitcoin. Scalping + Swing strategies built-in. FTMO, MFF, The5ers funded account mode. Fully automated. No manual input.</p>
+  <p>Agni-V runs 24/7 on XAUUSD and Bitcoin. Scalping + Swing strategies built-in. FTMO, MFF, The5ers funded account mode. Fully automated. No manual input.</p>
   <div class="hero-btns">
     <a href="#pricing" class="btn-primary">Start Free Trial →</a>
     <a href="#dashboard" class="btn-secondary">See Live Dashboard</a>
@@ -223,11 +238,11 @@
   <div class="section-title">Built for Funded Account Traders</div>
   <div class="section-sub">The bot auto-enforces firm-specific rules — so you never accidentally breach a limit.</div>
   <div class="prop-grid">
-    <div class="prop-card"><div class="firm">FTMO</div><div class="rule">5% Daily / 10% Total DD</div><div class="progress-bar"><div class="progress-fill" style="width:62%"></div></div><div class="rule" style="margin-top:0.4rem">62% Toward Target</div></div>
-    <div class="prop-card"><div class="firm">MyForexFunds</div><div class="rule">5% Daily / 12% Total DD</div><div class="progress-bar"><div class="progress-fill" style="width:45%"></div></div><div class="rule" style="margin-top:0.4rem">45% Toward Target</div></div>
-    <div class="prop-card"><div class="firm">The5ers</div><div class="rule">4% Daily / 6% Total DD</div><div class="progress-bar"><div class="progress-fill" style="width:78%"></div></div><div class="rule" style="margin-top:0.4rem">78% Toward Target</div></div>
-    <div class="prop-card"><div class="firm">Apex</div><div class="rule">3% Daily / 6% Total DD</div><div class="progress-bar"><div class="progress-fill" style="width:55%"></div></div><div class="rule" style="margin-top:0.4rem">55% Toward Target</div></div>
-    <div class="prop-card"><div class="firm">TrueForex</div><div class="rule">5% Daily / 10% Total DD</div><div class="progress-bar"><div class="progress-fill" style="width:30%"></div></div><div class="rule" style="margin-top:0.4rem">30% Toward Target</div></div>
+    <div class="prop-card"><div class="firm">FTMO</div><div class="rule">5% Daily / 10% Total DD</div><div class="progress-bar"><div class="progress-fill w-62"></div></div><div class="rule mt-04">62% Toward Target</div></div>
+    <div class="prop-card"><div class="firm">MyForexFunds</div><div class="rule">5% Daily / 12% Total DD</div><div class="progress-bar"><div class="progress-fill w-45"></div></div><div class="rule mt-04">45% Toward Target</div></div>
+    <div class="prop-card"><div class="firm">The5ers</div><div class="rule">4% Daily / 6% Total DD</div><div class="progress-bar"><div class="progress-fill w-78"></div></div><div class="rule mt-04">78% Toward Target</div></div>
+    <div class="prop-card"><div class="firm">Apex</div><div class="rule">3% Daily / 6% Total DD</div><div class="progress-bar"><div class="progress-fill w-55"></div></div><div class="rule mt-04">55% Toward Target</div></div>
+    <div class="prop-card"><div class="firm">TrueForex</div><div class="rule">5% Daily / 10% Total DD</div><div class="progress-bar"><div class="progress-fill w-30"></div></div><div class="rule mt-04">30% Toward Target</div></div>
   </div>
 </div>
 
@@ -238,14 +253,14 @@
   <div class="dashboard-preview">
     <div class="db-header">
       <div class="db-title"><span class="status-dot"></span>Bot Running — FUNDED Mode</div>
-      <div style="color:var(--muted);font-size:0.85rem">FTMO Challenge · Phase 1</div>
+      <div class="text-muted fs-085">FTMO Challenge · Phase 1</div>
     </div>
     <div class="db-grid">
       <div class="db-stat"><div class="val green">$10,842</div><div class="lbl">Balance</div></div>
       <div class="db-stat"><div class="val green">+$842</div><div class="lbl">Total Profit</div></div>
       <div class="db-stat"><div class="val">+$124</div><div class="lbl">Today PnL</div></div>
       <div class="db-stat"><div class="val">68%</div><div class="lbl">Win Rate</div></div>
-      <div class="db-stat"><div class="val" style="color:var(--gold)">8.4%</div><div class="lbl">Profit Progress</div></div>
+      <div class="db-stat"><div class="val text-gold">8.4%</div><div class="lbl">Profit Progress</div></div>
       <div class="db-stat"><div class="val">1.2%</div><div class="lbl">DD Used</div></div>
     </div>
     <div class="chart-area">
@@ -302,8 +317,8 @@
 
 <!-- FOOTER -->
 <footer>
-  <p>© 2026 ApexAlgo. All rights reserved. | <a href="#">Terms</a> · <a href="#">Privacy</a></p>
-  <p style="margin-top:0.5rem; font-size:0.75rem;">Trading involves risk. Past performance does not guarantee future results. Use funded mode only after extensive demo testing.</p>
+  <p>© 2026 Agni-V. All rights reserved. | <a href="#">Terms</a> · <a href="#">Privacy</a></p>
+  <p class="mt-05 fs-075">Trading involves risk. Past performance does not guarantee future results. Use funded mode only after extensive demo testing.</p>
 </footer>
 
 <script>

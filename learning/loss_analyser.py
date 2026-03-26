@@ -8,7 +8,7 @@ Stores diagnostics to Supabase for the Auto Improver to consume.
 import logging
 from typing import Dict, Any
 
-logger = logging.getLogger("apexalgo.learning.analyser")
+logger = logging.getLogger("agniv.learning.analyser")
 
 class LossAnalyser:
     def __init__(self):

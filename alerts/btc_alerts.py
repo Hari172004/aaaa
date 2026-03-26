@@ -7,7 +7,7 @@ Handles all Bitcoin-specific notifications.
 import logging
 from datetime import datetime
 
-logger = logging.getLogger("apexalgo.btc_alerts")
+logger = logging.getLogger("agniv.btc_alerts")
 
 class BTCAlerts:
     """Sends BTC-specific alerts to Telegram."""
@@ -23,7 +23,7 @@ class BTCAlerts:
                      entry: float = 0.0, sl: float = 0.0, tp: float = 0.0):
         emoji = "🟢" if signal == "BUY" else "🔴"
         msg = (
-            f"₿ <b>ApexAlgo BTC Signal</b>\n"
+            f"₿ <b>Agni-V BTC Signal</b>\n"
             f"{'─' * 30}\n"
             f"{emoji} <b>{symbol} {strategy} — {signal}</b>\n\n"
             f"📝 <i>{reason}</i>\n"

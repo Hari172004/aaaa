@@ -1,5 +1,5 @@
 """
-risk_manager.py — Smart Risk Management Engine for ApexAlgo
+risk_manager.py — Smart Risk Management Engine for Agni-V
 ==============================================================
 Handles: position sizing, SL/TP, breakeven, consecutive-loss stops,
 daily loss limits, and reduction of risk as drawdown increases.
@@ -8,7 +8,7 @@ daily loss limits, and reduction of risk as drawdown increases.
 import logging
 from dataclasses import dataclass, field
 
-logger = logging.getLogger("apexalgo.risk_manager")
+logger = logging.getLogger("agniv.risk_manager")
 
 
 @dataclass

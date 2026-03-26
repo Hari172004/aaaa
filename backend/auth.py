@@ -10,7 +10,7 @@ from fastapi import HTTPException, Header
 from typing import Optional
 from backend.database import is_license_valid
 
-logger = logging.getLogger("apexalgo.auth")
+logger = logging.getLogger("agniv.auth")
 
 _firebase_initialized = False
 
@@ -27,13 +27,13 @@ def init_firebase():
 def verify_firebase_token(id_token: str) -> dict:
     """Verify a Firebase ID token and return the decoded payload."""
     # [DEV MOCK] Always accept the mock token
-    return {"uid": "admin_101", "email": "admin@apexalgo.com", "plan": "ELITE"}
+    return {"uid": "admin_101", "email": "admin@agniv.com", "plan": "ELITE"}
 
 
 def get_current_user(authorization: str = Header(None)) -> dict:
     """FastAPI dependency — extract and verify Firebase token from auth header."""
     # [DEV MOCK] Always return the mock user
-    return {"uid": "admin_101", "email": "admin@apexalgo.com", "plan": "ELITE"}
+    return {"uid": "admin_101", "email": "admin@agniv.com", "plan": "ELITE"}
 
 
 def require_valid_license(user: Optional[dict] = None, user_id: Optional[str] = None) -> str:

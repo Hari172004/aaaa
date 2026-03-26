@@ -1,5 +1,5 @@
 """
-encryption.py — AES-256 Encryption Helpers for ApexAlgo Backend
+encryption.py — AES-256 Encryption Helpers for Agni-V Backend
 """
 
 import os
@@ -12,19 +12,19 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-class ApexAlgoEncryption:
+class Agni-VEncryption:
     def __init__(self, master_key_b64: str = None):  # type: ignore
         """
         Initializes the encryption module.
-        If master_key_b64 is not provided, it attempts to load APEXALGO_MASTER_KEY from env.
+        If master_key_b64 is not provided, it attempts to load AGNIV_MASTER_KEY from env.
         """
-        env_key = os.getenv("APEXALGO_MASTER_KEY")
+        env_key = os.getenv("AGNIV_MASTER_KEY")
         self.master_key = master_key_b64 or env_key
         
         if not self.master_key:
             # Fallback for development only: deterministic key from a known salt
             # In production, THIS MUST be set purely via ENV variable.
-            key_bytes = self.generate_key_from_password("apexalgo_dev_fallback", b"ante_salt")
+            key_bytes = self.generate_key_from_password("agniv_dev_fallback", b"ante_salt")
             self.master_key = key_bytes.decode('utf-8')
         
         # Ensure it's a valid Fernet key (must be URL-safe base64 encoded, 32 bytes)
@@ -39,7 +39,7 @@ class ApexAlgoEncryption:
         return Fernet.generate_key().decode('utf-8')
 
     @staticmethod
-    def generate_key_from_password(password: str, salt: bytes = b"apexalgo_salt_2026") -> bytes:
+    def generate_key_from_password(password: str, salt: bytes = b"agniv_salt_2026") -> bytes:
         """Derives a deterministic AES-256 Fernet key from a password and salt using PBKDF2."""
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
@@ -103,4 +103,4 @@ class ApexAlgoEncryption:
         return hmac.compare_digest(expected_signature, provided_signature)
 
 # Global singleton for backend usage
-kms = ApexAlgoEncryption()
+kms = Agni-VEncryption()

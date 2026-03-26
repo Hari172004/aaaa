@@ -7,7 +7,7 @@ try:
 except ImportError:
     FINBERT_AVAILABLE = False
 
-logger = logging.getLogger("apexalgo.sentiment.finbert")
+logger = logging.getLogger("agniv.sentiment.finbert")
 
 class FinBERTScorer:
     def __init__(self):

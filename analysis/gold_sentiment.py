@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen, Request
 
-logger = logging.getLogger("apexalgo.gold_sentiment")
+logger = logging.getLogger("agniv.gold_sentiment")
 
 # Gold RSS Feeds
 RSS_FEEDS = {

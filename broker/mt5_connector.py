@@ -8,7 +8,7 @@ import MetaTrader5 as mt5
 import pandas as pd
 from datetime import datetime
 
-logger = logging.getLogger("apexalgo.mt5")
+logger = logging.getLogger("agniv.mt5")
 
 TIMEFRAME_MAP = {
     "M1":  mt5.TIMEFRAME_M1,
@@ -121,7 +121,7 @@ class MT5Connector:
         return SYMBOL_MAP.get(symbol, symbol)
 
     def place_market_order(self, symbol: str, direction: str, volume: float,
-                           sl: float = 0.0, tp: float = 0.0, comment: str = "apexalgo") -> dict:
+                           sl: float = 0.0, tp: float = 0.0, comment: str = "agniv") -> dict:
         mt5_symbol = SYMBOL_MAP.get(symbol, symbol)
         tick = mt5.symbol_info_tick(mt5_symbol)  # type: ignore
         if tick is None:

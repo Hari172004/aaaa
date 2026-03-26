@@ -7,7 +7,7 @@ import ccxt
 import pandas as pd
 from typing import Optional
 
-logger = logging.getLogger("apexalgo.ccxt")
+logger = logging.getLogger("agniv.ccxt")
 
 SYMBOL_MAP = {
     "BTCUSD":  "BTC/USDT",

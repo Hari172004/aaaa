@@ -1,6 +1,6 @@
 /**
  * biometric.js — Fingerprint and Face ID Authentication 
- * Uses expo-local-authentication to quickly secure the ApexAlgo mobile app.
+ * Uses expo-local-authentication to quickly secure the Agni-V mobile app.
  */
 
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -12,7 +12,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
  * @param {string} promptMessage The text displayed on the Face ID / Touch ID popup.
  * @returns {Promise<boolean>} True if authenticated, false otherwise.
  */
-export async function authenticateBiometric(promptMessage = 'Unlock ApexAlgo Trading') {
+export async function authenticateBiometric(promptMessage = 'Unlock Agni-V Trading') {
     try {
         // 1. Check if hardware exists
         const hasHardware = await LocalAuthentication.hasHardwareAsync();

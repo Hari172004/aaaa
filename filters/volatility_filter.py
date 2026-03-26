@@ -6,7 +6,7 @@ Blocks trades if market is dead (below 0.8x ATR) or dangerously chaotic (above 2
 import logging
 import pandas as pd
 
-logger = logging.getLogger("apexalgo.filters.volatility")
+logger = logging.getLogger("agniv.filters.volatility")
 
 class VolatilityFilter:
     def __init__(self, period: int = 20, min_atr_multiplier: float = 0.8, max_atr_multiplier: float = 2.0):

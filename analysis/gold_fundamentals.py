@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from urllib.request import urlopen, Request
 from typing import List, Dict, Any
 
-logger = logging.getLogger("apexalgo.gold_fundamentals")
+logger = logging.getLogger("agniv.gold_fundamentals")
 
 # Yahoo Finance symbols
 YF_DXY   = "DX-Y.NYB"   # US Dollar Index

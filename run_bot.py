@@ -8,7 +8,7 @@ without needing to connect through the mobile app or localtunnel.
 import time
 import logging
 import threading
-from core import ApexAlgoBot, BotConfig # type: ignore
+from core import AgniVBot, BotConfig # type: ignore
 
 if __name__ == "__main__":
     import os
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         sniper_mode         = os.getenv("SNIPER_MODE", "false").lower() == "true",
     )
     
-    bot = ApexAlgoBot(config)
+    bot = AgniVBot(config)
 
     # ── Start Telegram Command Handler ────────────────────────
     from telegram_bot import TelegramCommandHandler  # type: ignore
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     bot.alerts.telegram_chat_id = ",".join(tg_handler.subscribers)
 
     # Start the bot in a background thread so we can maintain the Telegram sync loop
-    bot_thread = threading.Thread(target=bot.start, daemon=True, name="ApexAlgoCore")
+    bot_thread = threading.Thread(target=bot.start, daemon=True, name="AgniVCore")
     bot_thread.start()
 
     # 2. Notify user bot is ON (Non-blocking)
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         asset_label    = {"XAUUSD": "Gold 🥇", "BTCUSD": "Bitcoin ₿", "BOTH": "Gold 🥇 + Bitcoin ₿"}.get(selected_assets, selected_assets)
         strat_label    = {"SCALP": "⚡ SCALPER (M1/M5)", "SWING": "🎯 SWING (H1/H4)", "AUTO": "🤖 AUTO-PILOT"}.get(selected_strategy, selected_strategy)
         startup_msg    = (
-            f"🟢 <b>ApexAlgo Bot ONLINE</b>\n"
+            f"🟢 <b>Agni-V Bot ONLINE</b>\n"
             f"{'─' * 28}\n"
             f"📈 Asset:    <code>{asset_label}</code>\n"
             f"🎯 Strategy: <code>{strat_label}</code>\n"

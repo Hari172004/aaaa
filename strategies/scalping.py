@@ -13,7 +13,7 @@ import pandas as pd # type: ignore
 import ta # type: ignore
 from strategies.smc import SMCEngine # type: ignore
 
-logger = logging.getLogger("apexalgo.scalping")
+logger = logging.getLogger("agniv.scalping")
 
 PARAMS_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "optimized_params.json")
 

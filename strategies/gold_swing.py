@@ -11,7 +11,7 @@ from analysis.gold_market_structure import detect_gold_smc, near_ob # type: igno
 from analysis.gold_fundamentals import get_gold_fundamental_score # type: ignore
 from analysis.gold_sentiment import get_gold_news_sentiment # type: ignore
 
-logger = logging.getLogger("apexalgo.gold_swing")
+logger = logging.getLogger("agniv.gold_swing")
 
 FUNDAMENTAL_THRESHOLD = 20     # composite score must exceed this for swing
 MAX_HOLD_DAYS         = 10     # auto-close if no movement

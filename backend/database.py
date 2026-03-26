@@ -1,12 +1,12 @@
 """
-database.py — Supabase PostgreSQL Client for ApexAlgo
+database.py — Supabase PostgreSQL Client for Agni-V
 """
 
 import os
 import logging
 from supabase import create_client, Client
 
-logger = logging.getLogger("apexalgo.db")
+logger = logging.getLogger("agniv.db")
 
 _supabase_client: Client = None  # type: ignore
 

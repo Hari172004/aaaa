@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, date, timezone
 from analysis.gold_sessions import is_lbma_fix_time  # type: ignore
 
-logger = logging.getLogger("apexalgo.gold_risk")
+logger = logging.getLogger("agniv.gold_risk")
 
 # Risk constants
 MAX_RISK_PCT          = 2.0     # Max % account risk per trade

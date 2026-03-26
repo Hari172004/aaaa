@@ -19,8 +19,8 @@ import backtrader.analyzers as btanalyzers # type: ignore
 from backtest.backtester import ScalpStrategy, SwingStrategy # type: ignore
 
 # Suppress debug logs from the strategies during the heavy optimization loop
-logging.getLogger("apexalgo").setLevel(logging.WARNING)
-logger = logging.getLogger("apexalgo.optimizer")
+logging.getLogger("agniv").setLevel(logging.WARNING)
+logger = logging.getLogger("agniv.optimizer")
 logger.setLevel(logging.INFO)
 
 # Stream handler for console

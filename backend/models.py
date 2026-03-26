@@ -1,5 +1,5 @@
 """
-models.py — Pydantic data models for the ApexAlgo backend API
+models.py — Pydantic data models for the Agni-V backend API
 """
 
 from pydantic import BaseModel, Field

@@ -1,5 +1,5 @@
 """
-demo_mode.py — Paper Trading Engine for ApexAlgo
+demo_mode.py — Paper Trading Engine for Agni-V
 =====================================================
 Simulates trades using real market data without risking real money.
 Tracks virtual balance, open positions, trade history entirely in memory.
@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 
-logger = logging.getLogger("apexalgo.demo")
+logger = logging.getLogger("agniv.demo")
 
 
 @dataclass

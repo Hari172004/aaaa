@@ -9,7 +9,7 @@ from typing import Dict, Tuple, Optional
 import jwt
 import pyotp
 
-logger = logging.getLogger("apexalgo.auth")
+logger = logging.getLogger("agniv.auth")
 
 # ── Global Constants ─────────────────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ FAILED_LOGINS: Dict[str, Dict] = {}        # { email: {"attempts": int, "locked_
 USER_SESSIONS: Dict[str, Dict] = {}        # { user_id: { session_id: { ... } } }
 DEVICE_REGISTRY: Dict[str, list] = {}      # { user_id: [device_id_1, device_id_2] }
 
-class ApexAlgoAuth:
+class Agni-VAuth:
     def __init__(self, jwt_secret: Optional[str] = None):
         """
         Initializes the authentication module with a secure JWT signing secret.
@@ -150,7 +150,7 @@ class ApexAlgoAuth:
 
     def get_2fa_uri(self, secret: str, email: str) -> str:
         """Provides the URI to generate the QR Code."""
-        return pyotp.totp.TOTP(secret).provisioning_uri(name=email, issuer_name="ApexAlgo Trading")
+        return pyotp.totp.TOTP(secret).provisioning_uri(name=email, issuer_name="Agni-V Trading")
 
     def verify_2fa_code(self, secret: str, token: str) -> bool:
         """Verifies the user's 6-digit TOTP code."""
@@ -261,4 +261,4 @@ class ApexAlgoAuth:
             logger.info(f"[Auth] Session {session_id} manually logged out.")
 
 # Global instance
-auth_manager = ApexAlgoAuth()
+auth_manager = Agni-VAuth()

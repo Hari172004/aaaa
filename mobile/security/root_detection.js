@@ -1,6 +1,6 @@
 /**
  * root_detection.js — Jailbreak & Root Check
- * Blocks the ApexAlgo app on compromised devices to prevent 
+ * Blocks the Agni-V app on compromised devices to prevent 
  * broker credential dumping or API reverse engineering.
  */
 
@@ -43,7 +43,7 @@ export async function enforceDeviceIntegrity() {
     if (compromised) {
         Alert.alert(
             "Security Violation",
-            "This device appears to be rooted or jailbroken. For your financial security and to protect broker API keys, ApexAlgo Trading is disabled on this device.",
+            "This device appears to be rooted or jailbroken. For your financial security and to protect broker API keys, Agni-V Trading is disabled on this device.",
             [
                 { 
                     text: "Exit Application", 

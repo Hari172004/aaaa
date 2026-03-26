@@ -1,5 +1,5 @@
 """
-logger.py — ApexAlgo Trade Logger & Alerts
+logger.py — Agni-V Trade Logger & Alerts
 =============================================
 Sends alerts via Telegram and Email.
 Logs every trade to Supabase. Sends daily reports.
@@ -14,7 +14,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
 
-logger = logging.getLogger("apexalgo.alerts")
+logger = logging.getLogger("agniv.alerts")
 
 TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
 
@@ -43,7 +43,7 @@ class AlertManager:
         if not chat_ids:
             return False
 
-        prefix = "⚠️ <b>ApexAlgo Risk Alert</b>\n" if is_alert else "🚀 <b>ApexAlgo Signal</b>\n"
+        prefix = "⚠️ <b>Agni-V Risk Alert</b>\n" if is_alert else "🚀 <b>Agni-V Signal</b>\n"
         text = prefix + message
         url  = TELEGRAM_API.format(token=self.telegram_token)
         
@@ -69,7 +69,7 @@ class AlertManager:
         recipient = to or self.gmail_user
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"]    = f"ApexAlgo Bot <{self.gmail_user}>"
+        msg["From"]    = f"Agni-V Bot <{self.gmail_user}>"
         msg["To"]      = recipient
         msg.attach(MIMEText(body, "html"))
         try:
@@ -158,7 +158,7 @@ class AlertManager:
                           recipient_email: Optional[str] = None):
         now = datetime.utcnow().strftime("%Y-%m-%d")
         lines = [
-            f"<h2>📊 ApexAlgo Daily Report — {now}</h2>",
+            f"<h2>📊 Agni-V Daily Report — {now}</h2>",
             f"<b>Balance:</b> ${stats.get('balance', 0):,.2f}<br>",
             f"<b>Today PnL:</b> ${stats.get('today_pnl', 0):+.2f}<br>",
             f"<b>Trades:</b> {stats.get('trade_count_today', 0)} "
@@ -174,11 +174,11 @@ class AlertManager:
                 f"<b>Days Remaining:</b> {funded_report.get('days_remaining', 0)}<br>",
             ]
         body = "\n".join(lines)
-        subject = f"ApexAlgo Daily Report — {now}"
+        subject = f"Agni-V Daily Report — {now}"
         self.send_email(subject, body, recipient_email)
 
         tg_msg = (
-            f"📊 <b>Daily Report — {now}</b>\n"
+            f"📊 <b>Agni-V Daily Report — {now}</b>\n"
             f"Balance: <code>${stats.get('balance',0):,.2f}</code>\n"
             f"Today PnL: <code>${stats.get('today_pnl',0):+.2f}</code>\n"
             f"Win Rate: <code>{stats.get('win_rate_today',0):.1f}%</code>"

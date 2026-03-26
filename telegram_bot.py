@@ -1,5 +1,5 @@
 """
-telegram_bot.py — ApexAlgo Telegram Command Handler (Private/Whitelist Mode)
+telegram_bot.py — Agni-V Telegram Command Handler (Private/Whitelist Mode)
 =============================================================================
 Runs in a background thread alongside the trading bot.
 Listens for user commands and replies automatically via long-polling.
@@ -28,7 +28,7 @@ import threading
 import requests  # type: ignore
 from typing import Any, Optional, Set
 
-logger = logging.getLogger("apexalgo.telegram_bot")
+logger = logging.getLogger("agniv.telegram_bot")
 
 TELEGRAM_API_BASE = "https://api.telegram.org/bot{token}"
 
@@ -145,7 +145,7 @@ class TelegramCommandHandler:
         """Block unauthorized user and alert admin."""
         logger.warning(f"[TGBot] 🚫 Unauthorized access from {chat_id} (@{username})")
         self._send(chat_id,
-            "🔐 <b>ApexAlgo by Antegravity</b>\n\n"
+            "🔐 <b>Agni-V by Antegravity</b>\n\n"
             "Your access request has been sent.\n"
             "Please wait for admin approval.\n\n"
             "⏳ You will be notified once approved."
@@ -159,7 +159,7 @@ class TelegramCommandHandler:
                 ]]
             }
             self._send(self.owner_chat_id,
-                f"🔔 <b>ApexAlgo — New Access Request</b>\n\n"
+                f"🔔 <b>Agni-V — New Access Request</b>\n\n"
                 f"🔗 Username: @{username}\n"
                 f"🆔 User ID: <code>{chat_id}</code>\n\n"
                 f"Approve or reject this user?",
@@ -215,7 +215,7 @@ class TelegramCommandHandler:
         msg = (
             f"🚀 <b>Welcome, @{username}!</b>\n"
             f"{'─' * 30}\n"
-            f"🥇 <b>ApexAlgo Gold &amp; BTC Sniper</b>\n\n"
+            f"🥇 <b>Agni-V Gold &amp; BTC Sniper</b>\n\n"
             f"✅ You are <b>subscribed</b> to live signals.\n\n"
             f"<b>Commands:</b>\n"
             f"  /status — Bot status &amp; balance\n"
@@ -235,7 +235,7 @@ class TelegramCommandHandler:
             cfg        = bot.config
             risk_state = bot.risk_mgr.state
             msg = (
-                f"📊 <b>ApexAlgo Status</b>\n"
+                f"📊 <b>Agni-V Status</b>\n"
                 f"{'─' * 26}\n"
                 f"🏦 Balance:  <code>${balance:.2f}</code>\n"
                 f"📈 Assets:   <code>{cfg.assets}</code>\n"
@@ -256,7 +256,7 @@ class TelegramCommandHandler:
     def _cmd_help(self, chat_id: str, username: str = "Unknown"):
         is_admin = self._is_admin(chat_id, username)
         msg = (
-            f"🤖 <b>ApexAlgo Commands</b>\n"
+            f"🤖 <b>Agni-V Commands</b>\n"
             f"{'─' * 26}\n"
             f"/start  — Subscribe to signals\n"
             f"/status — Bot status &amp; balance\n"
@@ -280,7 +280,7 @@ class TelegramCommandHandler:
         self._send(admin_id, f"✅ <code>{target_id}</code> has been <b>approved</b>.")
         self._send(target_id,
             "🎉 <b>Access Granted!</b>\n"
-            "You have been approved to use ApexAlgo.\n"
+            "You have been approved to use Agni-V.\n"
             "Send /start to subscribe to live signals!"
         )
         logger.info(f"[TGBot] Admin approved {target_id}")
@@ -342,7 +342,7 @@ class TelegramCommandHandler:
             
             self._send(target_id,
                 "✅ <b>Access Approved!</b>\n\n"
-                "Welcome to ApexAlgo by Antegravity.\n"
+                "Welcome to Agni-V by Antegravity.\n"
                 "🚀 You now have full signal access.\n"
                 "📊 XAUUSD and BTC signals active.\n"
                 "⚡ Trade at the top. Always."

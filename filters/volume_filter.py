@@ -7,7 +7,7 @@ Prevents entry during dead/flat markets.
 import logging
 import pandas as pd
 
-logger = logging.getLogger("apexalgo.filters.volume")
+logger = logging.getLogger("agniv.filters.volume")
 
 class VolumeSpikeFilter:
     def __init__(self, multiplier: float = 1.5, lookback: int = 20):

@@ -8,7 +8,7 @@ if too many 'WEAK_SIGNAL' losses occurred).
 import logging
 from typing import Dict, List, Any
 
-logger = logging.getLogger("apexalgo.learning.improver")
+logger = logging.getLogger("agniv.learning.improver")
 
 class AutoImprover:
     def __init__(self):
@@ -70,7 +70,7 @@ class AutoImprover:
                 adjustments['REQ_MTF_CONFLUENCE'] = 5 # Increased from 4
                 
         # Generate weekly Telegram Report
-        report = "*ApexAlgo Auto-Improver Report*\n"
+        report = "*Agni-V Auto-Improver Report*\n"
         report += "\n".join(report_lines)
         if adjustments:
             report += "\n\n*Applied Adjustments:*\n"

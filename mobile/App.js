@@ -78,7 +78,7 @@ function LoginScreen({ onLogin }) {
     try {
       // Simulate real server delay
       setTimeout(() => {
-        if (email.toLowerCase() !== 'admin@apexalgo.com' || password !== 'Admin123') {
+        if (email.toLowerCase() !== 'admin@agniv.com' || password !== 'Admin123') {
           Alert.alert('Authentication Failed', 'Invalid email or password provided.');
           setLoading(false);
           return;
@@ -99,7 +99,7 @@ function LoginScreen({ onLogin }) {
           <View style={s.iconWrapper}>
             <Activity color={T.gold} size={48} strokeWidth={2.5} />
           </View>
-          <Text style={s.logo}>APEXALGO</Text>
+          <Text style={s.logo}>AGNIV</Text>
           <Text style={s.subtitle}>Trade Above the Market</Text>
         </View>
 
