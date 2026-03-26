@@ -241,17 +241,16 @@ class AgniVBot:
             self.stop()
 
     def stop(self):
-        """Clean shutdown."""
+        """Stops the bot and disconnects all components."""
         self._running = False
         
-        # 1. Disconnect broker first (High Priority)
-        try:
+        # Safe disconnect for components that might not have been initialized
+        if hasattr(self, 'btc_binance'): self.btc_binance.stop()
+        if hasattr(self, 'btc_bybit'):   self.btc_bybit.stop()
+        
+        if self.mt5:
             self.mt5.disconnect()
-            self.btc_binance.stop()
-            self.btc_bybit.stop()
-        except Exception as e:
-            logger.error(f"[Core] Error during disconnect: {e}")
-
+            
         # 2. Notify user bot is OFF (Low Priority, don't block)
         def _silent_notify():
             try:
