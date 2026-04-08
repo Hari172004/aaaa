@@ -12,7 +12,7 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-class Agni-VEncryption:
+class AgniVEncryption:
     def __init__(self, master_key_b64: str = None):  # type: ignore
         """
         Initializes the encryption module.
@@ -103,4 +103,4 @@ class Agni-VEncryption:
         return hmac.compare_digest(expected_signature, provided_signature)
 
 # Global singleton for backend usage
-kms = Agni-VEncryption()
+kms = AgniVEncryption()

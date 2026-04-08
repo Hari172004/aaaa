@@ -3,10 +3,16 @@ risk_manager.py — Smart Risk Management Engine for Agni-V
 ==============================================================
 Handles: position sizing, SL/TP, breakeven, consecutive-loss stops,
 daily loss limits, and reduction of risk as drawdown increases.
+
+PRO UPGRADES (v2):
+- Anti-Martingale: size UP after wins, DOWN after losses
+- Cooldown Circuit Breaker: 45-min pause after 2 losses (not full-day block)
 """
 
 import logging
+import time
 from dataclasses import dataclass, field
+from typing import Optional
 
 logger = logging.getLogger("agniv.risk_manager")
 
@@ -19,8 +25,11 @@ class RiskState:
     trade_count_today: int    = 0
     wins_today: int           = 0
     losses_today: int         = 0
+    consecutive_wins: int     = 0    # ← Anti-Martingale tracker
     paused: bool              = False
     pause_reason: str         = ""
+    cooldown_until: float     = 0.0  # ← Unix timestamp; 0 = no cooldown
+    anti_martingale_mult: float = 1.0  # ← Current lot-size multiplier (0.5 – 1.5)
 
 
 class RiskManager:
@@ -33,11 +42,15 @@ class RiskManager:
                  max_risk_pct: float = 2.0,
                  max_daily_loss_pct: float = 5.0,
                  max_consecutive_losses: int = 3,
-                 breakeven_at_r: float = 1.0):
+                 breakeven_at_r: float = 1.0,
+                 cooldown_losses: int = 2,          # ← Trigger 45-min cooldown after N losses
+                 cooldown_minutes: int = 45):        # ← How long the cooldown lasts
         self.max_risk_pct = max_risk_pct
         self.max_daily_loss_pct = max_daily_loss_pct
         self.max_consecutive_losses = max_consecutive_losses
         self.breakeven_at_r = breakeven_at_r
+        self.cooldown_losses = cooldown_losses
+        self.cooldown_minutes = cooldown_minutes
         self.state = RiskState()
 
     def set_dynamic_safety(self, balance: float):
@@ -74,6 +87,22 @@ class RiskManager:
             f"| Risk=${risk_amount:.2f} | SL={sl_pips}pips"
         )
         return lot_size
+
+    def calculate_lot_size_adjusted(self, balance: float, sl_pips: float,
+                                    pip_value: float, symbol: str) -> float:
+        """
+        Anti-Martingale variant: applies the current size multiplier.
+        Use this instead of calculate_lot_size() for all live entries.
+        """
+        base = self.calculate_lot_size(balance, sl_pips, pip_value, symbol)
+        adjusted = base * self.state.anti_martingale_mult
+        adjusted = round(float(max(0.01, min(adjusted, 10.0))), 2)  # type: ignore[arg-type]
+        if self.state.anti_martingale_mult != 1.0:
+            logger.info(
+                f"[RiskMgr] Anti-Martingale: Base lot={base} × "
+                f"{self.state.anti_martingale_mult:.2f} = {adjusted}"
+            )
+        return adjusted
 
     # ── ATR-Based SL / TP ─────────────────────────────────────
 
@@ -147,11 +176,24 @@ class RiskManager:
         """
         Base risk check — call BEFORE every trade.
         Returns (can_trade: bool, reason: str)
+        Includes smart cooldown: 45-min pause after N consecutive losses
+        (not a full-day block) so the bot resumes automatically.
         """
         s = self.state
+        now = time.time()
 
         if s.paused:
             return False, f"Risk pause: {s.pause_reason}"
+
+        # ── Cooldown Circuit Breaker ───────────────────────────────────────────────
+        if s.cooldown_until > 0:
+            if now < s.cooldown_until:
+                remaining_mins = int((s.cooldown_until - now) / 60)
+                return False, f"Cooldown active — resumes in {remaining_mins} min"
+            else:
+                # Cooldown expired — auto-resume
+                s.cooldown_until = 0.0
+                logger.info("[RiskMgr] ⏰ Cooldown lifted. Trading resumed automatically.")
 
         if s.consecutive_losses >= self.max_consecutive_losses:
             reason = f"Max consecutive losses ({self.max_consecutive_losses}) reached — pausing."
@@ -171,33 +213,58 @@ class RiskManager:
         return True, "OK"
 
     def update_after_trade(self, pnl: float):
-        """Update internal state after each trade closes."""
+        """Update internal state after each trade closes. Applies Anti-Martingale sizing."""
         s = self.state
         s.trade_count_today += 1
         if pnl >= 0:
             s.consecutive_losses = 0
-            s.wins_today += 1
+            s.wins_today         += 1
+            s.consecutive_wins   += 1
+            # Anti-Martingale: grow size by 10% after each win, cap at 1.5×
+            s.anti_martingale_mult = min(1.0 + (s.consecutive_wins * 0.10), 1.50)
+            # Reset streak after 3 wins (avoid over-sizing)
+            if s.consecutive_wins >= 3:
+                s.anti_martingale_mult = 1.0
+                s.consecutive_wins = 0
+                logger.info("[RiskMgr] Anti-Martingale: 3-win streak reset — size back to 1.0×")
+            else:
+                logger.info(f"[RiskMgr] Anti-Martingale: Win streak {s.consecutive_wins} — next lot ×{s.anti_martingale_mult:.2f}")
         else:
             s.consecutive_losses += 1
-            s.daily_loss += abs(pnl)
-            s.losses_today += 1
+            s.consecutive_wins    = 0
+            s.daily_loss         += abs(pnl)
+            s.losses_today       += 1
+            # Anti-Martingale: shrink size by 20% after each loss, floor at 0.5×
+            s.anti_martingale_mult = max(s.anti_martingale_mult * 0.80, 0.50)
+            logger.info(f"[RiskMgr] Anti-Martingale: Loss streak {s.consecutive_losses} — next lot ×{s.anti_martingale_mult:.2f}")
+            # Cooldown Circuit Breaker: after N losses, pause for cooldown_minutes
+            if s.consecutive_losses == self.cooldown_losses:
+                cooldown_secs = self.cooldown_minutes * 60
+                s.cooldown_until = time.time() + cooldown_secs
+                logger.warning(
+                    f"[RiskMgr] ⚡ Cooldown triggered after {self.cooldown_losses} losses! "
+                    f"Trading paused for {self.cooldown_minutes} minutes."
+                )
         logger.info(
             f"[RiskMgr] Trade result: PnL=${pnl:+.2f} | "
             f"ConsecLosses={s.consecutive_losses} | "
-            f"DailyLoss=${s.daily_loss:.2f}"
+            f"DailyLoss=${s.daily_loss:.2f} | SizeMult={s.anti_martingale_mult:.2f}"
         )
 
     def on_new_day(self, current_balance: float):
         """Reset daily counters at the start of each session."""
         s = self.state
-        s.consecutive_losses = 0
-        s.daily_loss = 0.0
+        s.consecutive_losses     = 0
+        s.consecutive_wins       = 0
+        s.daily_loss             = 0.0
         s.daily_starting_balance = current_balance
-        s.trade_count_today = 0
-        s.wins_today = 0
-        s.losses_today = 0
+        s.trade_count_today      = 0
+        s.wins_today             = 0
+        s.losses_today           = 0
+        s.cooldown_until         = 0.0  # lift any active cooldown on new day
+        s.anti_martingale_mult   = 1.0  # reset position sizing on new day
         if s.paused:
-            s.paused = False
+            s.paused       = False
             s.pause_reason = ""
             logger.info("[RiskMgr] Daily reset — pause lifted.")
 
@@ -215,13 +282,18 @@ class RiskManager:
     def stats(self) -> dict:
         s = self.state
         total = s.wins_today + s.losses_today
+        now   = time.time()
+        cooldown_remaining = max(0, int((s.cooldown_until - now) / 60)) if s.cooldown_until > now else 0
         return {
-            "consecutive_losses": s.consecutive_losses,
-            "daily_loss":         round(float(s.daily_loss), 2),  # type: ignore[arg-type]
-            "trade_count_today":  s.trade_count_today,
-            "wins_today":         s.wins_today,
-            "losses_today":       s.losses_today,
-            "win_rate_today":     round(float((s.wins_today / total * 100) if total > 0 else 0.0), 1),  # type: ignore[arg-type]
-            "paused":             s.paused,
-            "pause_reason":       s.pause_reason,
+            "consecutive_losses":    s.consecutive_losses,
+            "consecutive_wins":      s.consecutive_wins,
+            "daily_loss":            round(float(s.daily_loss), 2),  # type: ignore[arg-type]
+            "trade_count_today":     s.trade_count_today,
+            "wins_today":            s.wins_today,
+            "losses_today":          s.losses_today,
+            "win_rate_today":        round(float((s.wins_today / total * 100) if total > 0 else 0.0), 1),  # type: ignore[arg-type]
+            "paused":                s.paused,
+            "pause_reason":          s.pause_reason,
+            "cooldown_remaining_min": cooldown_remaining,
+            "anti_martingale_mult":  round(s.anti_martingale_mult, 2),
         }

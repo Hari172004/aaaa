@@ -582,6 +582,7 @@ class AgniVBot:
             spread_points   = spread,
             news_pause      = bool(upcoming_events),
             signal_strength = strength,
+            strategy        = strategy_mode,
         )
         if not risk_res["can_trade"]:
             logger.warning(f"[Core] Gold risk blocked: {risk_res['reason']}")
@@ -822,11 +823,11 @@ class AgniVBot:
                 symbol, direction, volume, entry, sl, tp, comment="agniv_demo"
             )
         elif self.config.mode in (MODE_REAL, MODE_FUNDED):
-            # ── Micro-Scalp: use 0.5R TP for fast exits ─────────────────────────
+            # ── Micro-Scalp: use 1.5R TP for better risk-reward ─────────────────────
             if self.config.micro_scalp:
                 risk_dist = abs(entry - sl)
-                tp = (entry + 0.5 * risk_dist) if direction == "BUY" else (entry - 0.5 * risk_dist)
-                logger.info(f"[Core] ⚡ Micro-Scalp TP set to 0.5R | TP={tp:.5f}")
+                tp = (entry + 1.5 * risk_dist) if direction == "BUY" else (entry - 1.5 * risk_dist)
+                logger.info(f"[Core] ⚡ Micro-Scalp TP set to 1.5R | TP={tp:.5f}")
 
             # Apply News Boost to TP if flagged (only if not already in micro mode)
             final_tp = tp

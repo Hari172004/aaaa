@@ -1,0 +1,102 @@
+{
+  "_comment": "DIY Scalp Config — fast signals, tight expiry window, best for M1/M5/M15 charts",
+  "symbol": "XAUUSD",
+  "timeframe": "M1",
+  "signal_expiry": 3,
+  "alternate_signal": true,
+
+  "leading_indicator": {
+    "name": "Range Filter",
+    "params": {
+      "period": 50,
+      "multiplier": 1.7
+    }
+  },
+
+  "confirmation_filters": [
+    {
+      "name": "rqk",
+      "enabled": true,
+      "params": {
+        "lookback": 8.0,
+        "relative_weight": 8.0,
+        "start_bar": 25,
+        "lag": 2
+      }
+    },
+    {
+      "name": "wae",
+      "enabled": true,
+      "params": {
+        "sensitivity": 150,
+        "fast_ema": 20,
+        "slow_ema": 40,
+        "bb_length": 20,
+        "bb_mult": 2.0,
+        "deadzone_rma": 100,
+        "deadzone_mult": 2.5
+      }
+    },
+    {
+      "name": "adx",
+      "enabled": true,
+      "params": {
+        "di_length": 10,
+        "adx_length": 5,
+        "key_level": 15,
+        "mode": "adx_di"
+      }
+    },
+    {
+      "name": "rsi",
+      "enabled": false,
+      "params": {
+        "rsi_length": 14,
+        "mode": "ma_cross"
+      }
+    },
+    {
+      "name": "macd",
+      "enabled": false,
+      "params": {
+        "fast_length": 12,
+        "slow_length": 26,
+        "signal_length": 9,
+        "mode": "crossover"
+      }
+    },
+    {
+      "name": "ssl_channel",
+      "enabled": false,
+      "params": {
+        "period": 10
+      }
+    },
+    {
+      "name": "stochastic",
+      "enabled": false,
+      "params": {
+        "length": 14,
+        "smooth_k": 3,
+        "smooth_d": 3,
+        "mode": "ob_os_crossover"
+      }
+    },
+    {
+      "name": "cci",
+      "enabled": false,
+      "params": {
+        "length": 20,
+        "upper_band": 100,
+        "lower_band": -100
+      }
+    },
+    {
+      "name": "ema_filter",
+      "enabled": false,
+      "params": {
+        "period": 200
+      }
+    }
+  ]
+}

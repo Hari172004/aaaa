@@ -2,6 +2,12 @@
 gold_scalp.py -- Full Gold scalping strategy (1m/5m)
 Rules: Kill Zone only, EMA cross + RSI + volume + BB squeeze + Order Block alignment.
 Max 5 trades/session, no trades 30 mins before news, min 10 pip SL.
+
+v2.0 — Added:
+  [NEW] Range Filter  — choppy market gate
+  [NEW] RQK Kernel    — kernel trend bias
+  [NEW] WAE           — momentum explosion gate
+  [NEW] Supertrend    — HTF trend direction gate
 """
 
 import logging
@@ -17,6 +23,17 @@ try:
 except ImportError:
     _PPO_AVAILABLE = False
 
+# ── New filters ported from ZPayab Pine Script ───────────────────
+try:
+    from filters.range_filter      import gold_range_filter  # type: ignore
+    from filters.rqk_filter        import gold_rqk_filter    # type: ignore
+    from filters.wae_filter        import gold_wae_filter    # type: ignore
+    from filters.supertrend_filter import gold_supertrend_filter  # type: ignore
+    from filters.bullbyte_engine   import BullByteEngine          # type: ignore
+    _NEW_FILTERS_AVAILABLE = True
+except ImportError:
+    _NEW_FILTERS_AVAILABLE = False
+
 logger = logging.getLogger("agniv.gold_scalp")
 
 MAX_SCALPS_PER_SESSION = 5
@@ -28,6 +45,8 @@ class GoldScalpStrategy:
         self._session_trades: dict = {}   # session_key → trade count
         # PPO Reinforcement Learning agent (lazy-loaded)
         self._ppo: "PPOAgent | None" = PPOAgent("XAUUSD") if _PPO_AVAILABLE else None  # type: ignore
+        # Filter gate — require ≥2 of 4 new filters to vote before signal passes
+        self.filter_gate_min = 2
 
     # ── Public API ────────────────────────────────────────────────────────
 
@@ -93,14 +112,26 @@ class GoldScalpStrategy:
         # 5. Momentum: 50 EMA + RSI (M1/M5)
         ema50 = float(last.get("ema_50", 0))
         rsi   = float(last.get("rsi", 50))
+
+        # Instantaneous crossover (fires on the exact candle of the cross)
         rsi_bullish = rsi > 50 and prev.get("rsi", 50) <= 50
         rsi_bearish = rsi < 50 and prev.get("rsi", 50) >= 50
-        momentum_scalp_up = live_close_val > ema50 and rsi_bullish
+        momentum_scalp_up   = live_close_val > ema50 and rsi_bullish
         momentum_scalp_down = live_close_val < ema50 and rsi_bearish
+
+        # Sustained trend — fires mid-session when bot starts after the cross
+        # RSI clearly in bullish/bearish zone (not near the 50 fence)
+        rsi_sustained_bull = rsi > 55 and live_close_val > ema50
+        rsi_sustained_bear = rsi < 45 and live_close_val < ema50
+        momentum_sustained_up   = rsi_sustained_bull
+        momentum_sustained_down = rsi_sustained_bear
 
         # Volume RVOL: Current Volume vs 20-period MA
         vol_avg = df["volume"].tail(20).mean()
-        rvol = last["volume"] / vol_avg if vol_avg > 0 else 1.0
+        raw_vol = float(last.get("volume", 0))
+        # If vol data is missing/zero from the feed, treat as neutral (don't block)
+        vol_data_valid = vol_avg > 0 and raw_vol > 0
+        rvol = (raw_vol / vol_avg) if vol_data_valid else 1.0
 
         # Squeeze check
         if bool(last.get("bb_squeeze", False)):
@@ -132,12 +163,26 @@ class GoldScalpStrategy:
         hold_reasons = []
 
         # BUY Logic
+        # Instantaneous: EMA9 just crossed ABOVE EMA21 this candle
         ema_cross_up = last["ema_9"] > last["ema_21"] and prev["ema_9"] <= prev["ema_21"]
-        is_buy_trigger = ict_buy_setup or momentum_scalp_up or ema_cross_up or channel_break_up
+        # Sustained: EMA9 has been above EMA21 for ≥3 candles (mid-session entry)
+        last3 = df.iloc[-4:-1]   # 3 closed candles before current
+        ema_sustained_up = all(last3.iloc[i]["ema_9"] > last3.iloc[i]["ema_21"] for i in range(len(last3))) if len(last3) >= 3 else False
+        ema_sustained_dn = all(last3.iloc[i]["ema_9"] < last3.iloc[i]["ema_21"] for i in range(len(last3))) if len(last3) >= 3 else False
+        # BULLBYTE ULTIMATE SCALPER
+        try:
+            bb_eval = BullByteEngine.evaluate(df)
+            bb_buy = bb_eval.get("buy", False)
+            bb_sell = bb_eval.get("sell", False)
+        except Exception:
+            bb_buy, bb_sell = False, False
+
+        is_buy_trigger = ict_buy_setup or momentum_scalp_up or ema_cross_up or channel_break_up or \
+                         (ema_sustained_up and momentum_sustained_up) or bb_buy
         
         if is_buy_trigger:
             if not h1_bullish: hold_reasons.append("H1 Trend Bearish")
-            if rvol < 1.1:           hold_reasons.append(f"Low RVOL ({rvol:.1f})")
+            if vol_data_valid and rvol < 1.0: hold_reasons.append(f"Low RVOL ({rvol:.1f})")
             if is_sniper and not ha_bull: hold_reasons.append("HA Candle Red")
             
             if not hold_reasons:
@@ -148,9 +193,11 @@ class GoldScalpStrategy:
 
                 signal   = "BUY"
                 strength = 0.75 # Baseline for V2.0
-                if ict_buy_setup: strength += 0.15; reasons.append("ICT Sweep+FVG")
-                elif channel_break_up: strength += 0.10; reasons.append("HA Breakout")
-                elif momentum_scalp_up: strength += 0.05; reasons.append("EMA+RSI Scalp")
+                if bb_buy:                strength += 0.25; reasons.append("BullByte Ultimate (Kinetic+Memory)") # max strength -> Auto Override
+                elif ict_buy_setup:       strength += 0.15; reasons.append("ICT Sweep+FVG")
+                elif channel_break_up:    strength += 0.10; reasons.append("HA Breakout")
+                elif momentum_scalp_up:   strength += 0.07; reasons.append("EMA+RSI Cross")
+                elif ema_sustained_up:    strength += 0.03; reasons.append("EMA+RSI Sustained")  # lower: mid-session
                 
                 if h1_bullish: strength += 0.10; reasons.append("H1 Trend+")
                 if rvol > 1.5: strength += 0.05; reasons.append("Vol Spike")
@@ -158,11 +205,12 @@ class GoldScalpStrategy:
         # SELL Logic
         if signal == "HOLD":
             ema_cross_down = last["ema_9"] < last["ema_21"] and prev["ema_9"] >= prev["ema_21"]
-            is_sell_trigger = ict_sell_setup or momentum_scalp_down or ema_cross_down or channel_break_dn
+            is_sell_trigger = ict_sell_setup or momentum_scalp_down or ema_cross_down or channel_break_dn or \
+                              (ema_sustained_dn and momentum_sustained_down) or bb_sell
             
             if is_sell_trigger:
                 if not h1_bearish: hold_reasons.append("H1 Trend Bullish")
-                if rvol < 1.1:           hold_reasons.append(f"Low RVOL ({rvol:.1f})")
+                if vol_data_valid and rvol < 1.0: hold_reasons.append(f"Low RVOL ({rvol:.1f})")
                 if is_sniper and ha_bull: hold_reasons.append("HA Candle Green")
 
                 if not hold_reasons:
@@ -172,9 +220,11 @@ class GoldScalpStrategy:
 
                     signal   = "SELL"
                     strength = 0.75
-                    if ict_sell_setup: strength += 0.15; reasons.append("ICT Sweep+FVG")
-                    elif channel_break_dn: strength += 0.10; reasons.append("HA Breakout")
-                    elif momentum_scalp_down: strength += 0.05; reasons.append("EMA+RSI Scalp")
+                    if bb_sell:               strength += 0.25; reasons.append("BullByte Ultimate (Kinetic+Memory)") # max strength -> Auto Override
+                    elif ict_sell_setup:      strength += 0.15; reasons.append("ICT Sweep+FVG")
+                    elif channel_break_dn:    strength += 0.10; reasons.append("HA Breakout")
+                    elif momentum_scalp_down: strength += 0.07; reasons.append("EMA+RSI Cross")
+                    elif ema_sustained_dn:    strength += 0.03; reasons.append("EMA+RSI Sustained")  # lower: mid-session
                     
                     if h1_bearish: strength += 0.10; reasons.append("H1 Trend-")
                     if rvol > 1.5: strength += 0.05; reasons.append("Vol Spike")
@@ -182,6 +232,63 @@ class GoldScalpStrategy:
         if signal != "HOLD":
             sl_dist = max(atr * 1.5, 1.0)
             tp_dist = sl_dist * 2.0
+
+            # ── New Filter Gate (Range Filter + RQK + WAE + Supertrend) ──
+            if _NEW_FILTERS_AVAILABLE:
+                is_buy = signal == "BUY"
+                filter_votes = 0
+                filter_log   = []
+
+                # 1. Range Filter — block choppy markets
+                rf = gold_range_filter.evaluate(df)
+                rf_ok = (rf["upward"] if is_buy else rf["downward"])
+                if rf_ok:
+                    filter_votes += 1
+                    filter_log.append("RF✅")
+                else:
+                    filter_log.append(f"RF❌({rf['trend']})")
+
+                # 2. RQK Kernel — kernel trend must agree
+                rqk = gold_rqk_filter.evaluate(df)
+                rqk_ok = (rqk["bullish"] if is_buy else rqk["bearish"])
+                if rqk_ok:
+                    filter_votes += 1
+                    filter_log.append("RQK✅")
+                else:
+                    filter_log.append(f"RQK❌({rqk['trend']})")
+
+                # 3. WAE — momentum explosion must exist before entry
+                wae = gold_wae_filter.evaluate(df)
+                wae_ok = (wae["safe_buy"] if is_buy else wae["safe_sell"])
+                if wae_ok:
+                    filter_votes += 1
+                    filter_log.append("WAE✅")
+                else:
+                    filter_log.append("WAE❌(no explosion)")
+
+                # 4. Supertrend — HTF direction gate
+                st = gold_supertrend_filter.evaluate(df)
+                st_ok = (st["safe_buy"] if is_buy else st["safe_sell"])
+                if st_ok:
+                    filter_votes += 1
+                    filter_log.append("ST✅")
+                else:
+                    filter_log.append(f"ST❌({st['trend']})")
+
+                filter_summary = " | ".join(filter_log)
+                logger.info(
+                    f"[GoldScalp] Filter Gate: {filter_votes}/4 votes | "
+                    f"{filter_summary} | Signal={signal}"
+                )
+
+                if filter_votes < self.filter_gate_min:
+                    return {
+                        **empty,
+                        "reason": f"Filter Gate Failed ({filter_votes}/4): {filter_summary}"
+                    }
+
+                # Boost strength per confirming filter vote
+                strength = min(strength + (filter_votes * 0.03), 1.0)
 
             # ── PPO Confirmation Filter ───────────────────────────
             if self._ppo is not None and self._ppo.is_available():

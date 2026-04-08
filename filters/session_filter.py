@@ -1,6 +1,7 @@
 """
-session_filter.py — Strict Kill Zone & Liquidity Enforcement
-Blocks all trades outside of precise algorithmic time windows to avoid fakeouts and dead markets.
+session_filter.py — Strict Kill Zone & Liquidity Enforcement (Gold Only)
+Blocks Gold trades outside of precise algorithmic time windows to avoid fakeouts and dead markets.
+BTC trades 24/7 and is exempt from all session filtering.
 """
 
 import logging
@@ -21,12 +22,18 @@ class SessionFilter:
             return start <= t or t <= end
 
     def is_kill_zone_active(self, symbol: str) -> bool:
-        """Checks if current GMT time falls inside the allowed Kill Zones."""
+        """Checks if current GMT time falls inside the allowed Kill Zones.
+        BTC is 24/7 and always returns True. Kill zone enforcement is Gold-only.
+        """
+        is_btc = "BTC" in symbol.upper() or "BITCOIN" in symbol.upper()
+        if is_btc:
+            # BTC trades 24/7 — no session restrictions
+            return True
+
         now_gmt = datetime.now(self.gmt_tz)
         current_time = now_gmt.time()
-        
+
         is_xau = "XAU" in symbol.upper() or "GOLD" in symbol.upper()
-        is_btc = "BTC" in symbol.upper() or "BITCOIN" in symbol.upper()
 
         if is_xau:
             # Gold Kill Zones (GMT/UTC):
@@ -36,31 +43,25 @@ class SessionFilter:
             london_kz = self._is_time_in_range(current_time, dtime(7, 0), dtime(10, 0))
             ny_kz     = self._is_time_in_range(current_time, dtime(12, 0), dtime(15, 0))
             ldn_close = self._is_time_in_range(current_time, dtime(14, 0), dtime(16, 0))
-            
+
             if london_kz or ny_kz or ldn_close:
-                return True
-                
-        elif is_btc:
-            # BTC Kill Zones (GMT/UTC):
-            # NY Open: 13:00 to 17:00
-            # London Open: 07:00 to 10:00
-            # Asian Breakout: 00:00 to 03:00
-            ny_open    = self._is_time_in_range(current_time, dtime(13, 0), dtime(17, 0))
-            ldn_open   = self._is_time_in_range(current_time, dtime(7, 0), dtime(10, 0))
-            asian_open = self._is_time_in_range(current_time, dtime(0, 0), dtime(3, 0))
-            
-            if ny_open or ldn_open or asian_open:
                 return True
 
         return False
 
     def is_liquidity_safe(self, symbol: str) -> bool:
         """
-        Detects low liquidity periods:
+        Detects low liquidity periods (Gold only):
         1. Asian Session for Gold (22:00 to 06:00 GMT)
-        2. Sunday first 2 hours (21:00 to 23:00 GMT depending on DST)
-        3. Friday close (21:30 to 22:00 GMT)
+        2. Sunday first 2 hours (21:00 to 23:00 GMT depending on DST)  — Gold only
+        3. Friday close (21:30 to 22:00 GMT)                           — Gold only
+        BTC is 24/7 and is always considered liquidity-safe.
         """
+        is_btc = "BTC" in symbol.upper() or "BITCOIN" in symbol.upper()
+        if is_btc:
+            # BTC trades 24/7 — always liquid
+            return True
+
         now_gmt = datetime.now(self.gmt_tz)
         current_time = now_gmt.time()
         weekday = now_gmt.weekday()
@@ -72,14 +73,14 @@ class SessionFilter:
                 logger.warning(f"[SESSION] {symbol} inside Asian session dead zone. Blocking.")
                 return False
 
-        # 2. Sunday Open
-        if weekday == 6: # Sunday
+        # 2. Sunday Open (Gold)
+        if weekday == 6:  # Sunday
             if self._is_time_in_range(current_time, dtime(21, 0), dtime(23, 0)):
                 logger.warning(f"[SESSION] Sunday market open erratic gap zone. Blocking.")
                 return False
 
-        # 3. Friday Close
-        if weekday == 4: # Friday
+        # 3. Friday Close (Gold)
+        if weekday == 4:  # Friday
             if self._is_time_in_range(current_time, dtime(21, 30), dtime(23, 59)):
                 logger.warning(f"[SESSION] Friday market close dumping zone. Blocking.")
                 return False
@@ -87,7 +88,7 @@ class SessionFilter:
         # Note: Bank holiday calendars would be checked here via ForexFactory API
         # but to keep it self-contained without risking third-party API keys today,
         # we rely on the strict time checks above.
-        
+
         return True
 
     def validate_trade_window(self, symbol: str) -> bool:

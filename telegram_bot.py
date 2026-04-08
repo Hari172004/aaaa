@@ -60,6 +60,17 @@ class TelegramCommandHandler:
 
         logger.info(f"[TGBot] Whitelist loaded: {len(self._allowed_ids)} approved user(s).")
 
+    def _save_allowed_ids(self):
+        try:
+            import dotenv
+            from pathlib import Path
+            env_path = Path(".env").absolute()
+            if env_path.exists():
+                current = ",".join(sorted(self._allowed_ids))
+                dotenv.set_key(str(env_path), "TELEGRAM_ALLOWED_IDS", current)
+        except Exception as e:
+            logger.error(f"[TGBot] Failed to persist TELEGRAM_ALLOWED_IDS: {e}")
+
     # ── Public API ────────────────────────────────────────────
 
     def set_bot(self, bot):
@@ -277,6 +288,7 @@ class TelegramCommandHandler:
     def _cmd_approve(self, admin_id: str, target_id: str):
         self._allowed_ids.add(target_id)
         self._subscribers.add(target_id)
+        self._save_allowed_ids()
         self._send(admin_id, f"✅ <code>{target_id}</code> has been <b>approved</b>.")
         self._send(target_id,
             "🎉 <b>Access Granted!</b>\n"
@@ -291,6 +303,7 @@ class TelegramCommandHandler:
             return
         self._allowed_ids.discard(target_id)
         self._subscribers.discard(target_id)
+        self._save_allowed_ids()
         self._send(admin_id, f"🚫 <code>{target_id}</code> has been <b>revoked</b>.")
         logger.info(f"[TGBot] Admin revoked {target_id}")
 
@@ -339,6 +352,7 @@ class TelegramCommandHandler:
         if data.startswith("approve_"):
             self._allowed_ids.add(target_id)
             self._subscribers.add(target_id)
+            self._save_allowed_ids()
             
             self._send(target_id,
                 "✅ <b>Access Approved!</b>\n\n"

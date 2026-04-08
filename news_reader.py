@@ -17,7 +17,7 @@ import threading
 
 logger = logging.getLogger("agniv.news")
 
-FOREXFACTORY_RSS = "https://www.forexfactory.com/ff_calendar_thisweek.xml"
+FOREXFACTORY_RSS = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
 NEWSAPI_ENDPOINT = "https://newsapi.org/v2/everything"
 
 # Keywords that affect XAUUSD and BTC
@@ -81,10 +81,8 @@ class NewsReader:
             return []
 
     def _fetch_forexfactory(self) -> list:
-        """Parse ForexFactory RSS calendar for high-impact events."""
         try:
-            resp = requests.get(FOREXFACTORY_RSS, timeout=10,
-                                headers={"User-Agent": "Mozilla/5.0"})
+            resp = requests.get(FOREXFACTORY_RSS, timeout=10)
             resp.raise_for_status()
             root = ET.fromstring(resp.content)
             events = []
@@ -175,16 +173,25 @@ class NewsReader:
         return time.time() - self._last_fetch >= self.fetch_interval
 
     def start_background_refresh(self):
-        """Spawn a daemon thread that auto-refreshes news every interval."""
+        """Spawn a daemon thread that fetches immediately then auto-refreshes every interval."""
+        self._stop_event = threading.Event()
+
         def _loop():
-            while True:
+            while not self._stop_event.is_set():
                 try:
                     self.fetch_all()
                 except Exception as e:
                     logger.error(f"[News] Background refresh error: {e}")
-                time.sleep(self.fetch_interval)
+                # Wait for the next interval, checking stop frequently
+                self._stop_event.wait(timeout=self.fetch_interval)
 
         t = threading.Thread(target=_loop, daemon=True, name="news-refresh")
         t.start()
-        logger.info("[News] Background refresh started (every "
-                    f"{self.fetch_interval//60} min)")
+        logger.info("[News] Background refresh started — first fetch triggered immediately "
+                    f"(every {self.fetch_interval//60} min thereafter)")
+
+    def stop(self):
+        """Signal the background refresh thread to stop."""
+        stop_ev = getattr(self, "_stop_event", None)
+        if stop_ev:
+            stop_ev.set()

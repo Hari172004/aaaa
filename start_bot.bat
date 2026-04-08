@@ -14,4 +14,3 @@ python run_bot.py
 
 echo.
 echo Bot session ended.
-pause

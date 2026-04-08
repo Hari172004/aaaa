@@ -1,0 +1,120 @@
+2026-04-07 17:27:26 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:26 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:26 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:26 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:26 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=2/3
+2026-04-07 17:27:26 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:27 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:27 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:27 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:27 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:27 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=3/3
+2026-04-07 17:27:27 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:28 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:28 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:28 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:28 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:28 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=None bars=0/3
+2026-04-07 17:27:28 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:29 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:29 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:29 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:29 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:29 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=1/3
+2026-04-07 17:27:29 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:30 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:30 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:30 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:30 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:30 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=2/3
+2026-04-07 17:27:30 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:31 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:31 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:31 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:31 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:31 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=3/3
+2026-04-07 17:27:31 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:32 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:32 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:32 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:32 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:32 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=None bars=0/3
+2026-04-07 17:27:32 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:33 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:33 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:33 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:33 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:33 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=1/3
+2026-04-07 17:27:33 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:34 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:34 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:34 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:34 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:34 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=2/3
+2026-04-07 17:27:34 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:35 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:35 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:35 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:35 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:35 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=3/3
+2026-04-07 17:27:35 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:36 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:36 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:36 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:36 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:36 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=None bars=0/3
+2026-04-07 17:27:36 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:38 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:38 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:38 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:38 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:38 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=1/3
+2026-04-07 17:27:38 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:39 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:39 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:39 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:39 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:39 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=2/3
+2026-04-07 17:27:39 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:40 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:40 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:40 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:40 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:40 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=3/3
+2026-04-07 17:27:40 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:41 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:41 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:41 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:41 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:41 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=None bars=0/3
+2026-04-07 17:27:41 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:42 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:42 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:42 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:42 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:42 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=1/3
+2026-04-07 17:27:42 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:43 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:43 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:43 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:43 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:43 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=2/3
+2026-04-07 17:27:43 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:44 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:44 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:44 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:44 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:44 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=3/3
+2026-04-07 17:27:44 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:45 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:45 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:45 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:45 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:45 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=None bars=0/3
+2026-04-07 17:27:45 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']
+2026-04-07 17:27:46 | INFO     | agniv.news | [News] Sentiment=NEUTRAL (-0.002) | HighImpact=0
+2026-04-07 17:27:46 | INFO     | agniv.risk_manager | [RiskMgr] NANO balance (21.29) detected. Breakeven=0.3R, MaxLoss=20%.
+2026-04-07 17:27:46 | INFO     | agniv.gold_risk | [GoldRisk] Balance=$21.29 | Tier=MICRO | BaseRisk=4.0%
+2026-04-07 17:27:46 | INFO     | agniv.core | [Core] Nano Account ($21.29) — forced SCALP mode
+2026-04-07 17:27:46 | INFO     | agniv.core | [Core] XAUUSD | DIY Strategy signal=HOLD | pending=BUY bars=1/3
+2026-04-07 17:27:46 | INFO     | agniv.core | [Core] XAUUSD | Strategy=SCALP | Signal=HOLD | Sentiment=NEUTRAL | Final=HOLD | Strength=0% | DIY[_RangeFilterLeading]+['rqk', 'wae', 'adx']

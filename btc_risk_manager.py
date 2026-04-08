@@ -18,6 +18,24 @@ class BTCRiskManager:
 
     def __init__(self, max_risk_pct: float = 2.0):
         self.max_risk_pct = max_risk_pct
+        self.low_balance_mode = False
+
+    def set_dynamic_safety(self, balance: float):
+        """Adjust risk parameters based on account size."""
+        self.low_balance_mode = (balance < 500)
+        if self.low_balance_mode:
+            logger.info(f"[BTCRisk] Low balance ({balance}) detected. Compounding tiers active.")
+
+    def _calculate_compounding_multiplier(self, balance: float) -> float:
+        """Dynamically scales the base risk percentage based on account tier."""
+        if balance < 50:
+            return 2.0
+        elif balance < 100:
+            return 2.5
+        elif balance < 500:
+            return 2.0
+        else:
+            return self.max_risk_pct
 
     def check_all_rules(self, 
                          account_balance: float, 
@@ -36,8 +54,9 @@ class BTCRiskManager:
             logger.info("[Risk] Reducing BTC risk due to active Gold position.")
 
         # ── 2. Position Sizing ────────────────────────────────
-        # Risk Amount = Balance * (Risk% * Multiplier) / 100
-        risk_amt = account_balance * (self.max_risk_pct * risk_multiplier) / 100
+        # Dynamic Auto-Compounding Tier
+        base_risk = self._calculate_compounding_multiplier(account_balance)
+        risk_amt = account_balance * (base_risk * risk_multiplier) / 100
         
         # Stop Loss distance (using ATR)
         sl_dist = 1.5 * atr if atr > 0 else 500.0 # fallback

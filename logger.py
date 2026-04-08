@@ -8,6 +8,7 @@ Logs every trade to Supabase. Sends daily reports.
 import os
 import smtplib
 import logging
+import logging.handlers
 import requests # type: ignore
 from datetime import datetime
 from email.mime.text import MIMEText
@@ -17,6 +18,39 @@ from typing import Optional
 logger = logging.getLogger("agniv.alerts")
 
 TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
+
+
+def setup_file_logging(
+    log_file: str = "agniv_bot.log",
+    max_bytes: int = 5 * 1024 * 1024,   # 5 MB per file
+    backup_count: int = 3,               # keep 3 rotated files
+    level: int = logging.INFO,
+):
+    """
+    Attach a rotating file handler to the root logger.
+    Call this once at bot startup (before any other logging calls).
+    Files: agniv_bot.log, agniv_bot.log.1, agniv_bot.log.2 ...
+    """
+    handler = logging.handlers.RotatingFileHandler(
+        log_file,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",
+    )
+    handler.setLevel(level)
+    fmt = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    handler.setFormatter(fmt)
+    root = logging.getLogger()
+    # Avoid adding duplicate handlers on hot-reload
+    if not any(isinstance(h, logging.handlers.RotatingFileHandler) for h in root.handlers):
+        root.addHandler(handler)
+    logging.getLogger("agniv").info(
+        f"[Logger] Rotating log enabled → {log_file} "
+        f"(max {max_bytes//1024//1024}MB × {backup_count} backups)"
+    )
 
 
 class AlertManager:
@@ -100,7 +134,7 @@ class AlertManager:
             f"Sentiment: <code>{sentiment}</code>\n"
             f"🕐 {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
         )
-        # self.send_telegram(msg)
+        self.send_telegram(msg)
 
     def trade_closed(self, trade: dict):
         symbol    = trade.get("symbol", "N/A")
@@ -122,7 +156,28 @@ class AlertManager:
 
     def risk_alert(self, message: str):
         logger.warning(f"[Alert] ⚠️ RISK: {message}")
-        # self.send_telegram(message, is_alert=True)
+        self.send_telegram(message, is_alert=True)
+
+    def send_heartbeat(self, balance: float, open_trades: int, today_pnl: float,
+                       uptime_mins: int = 0):
+        """
+        Send a Telegram heartbeat ping with current bot status.
+        Call every 30 minutes from your main loop to confirm the bot is alive.
+        """
+        emoji = "🟢" if today_pnl >= 0 else "🔴"
+        msg = (
+            f"💓 <b>Agni-V Heartbeat</b>\n"
+            f"Status: {emoji} <code>RUNNING</code>\n"
+            f"Balance: <code>${balance:,.2f}</code>\n"
+            f"Today PnL: <code>${today_pnl:+.2f}</code>\n"
+            f"Open Trades: <code>{open_trades}</code>\n"
+            f"Uptime: <code>{uptime_mins}m</code>\n"
+            f"🕐 {datetime.utcnow().strftime('%H:%M')} UTC"
+        )
+        sent = self.send_telegram(msg)
+        if not sent:
+            logger.warning("[Heartbeat] Telegram ping failed — check token/chat_id")
+        return sent
 
     # ── Supabase Logging ──────────────────────────────────────
 
@@ -189,4 +244,4 @@ class AlertManager:
                 f"Progress: <code>{funded_report.get('profit_progress_pct',0):.1f}%</code> to target\n"
                 f"Drawdown: <code>{funded_report.get('drawdown_used_pct',0):.1f}%</code> used"
             )
-        # self.send_telegram(tg_msg)
+        self.send_telegram(tg_msg)

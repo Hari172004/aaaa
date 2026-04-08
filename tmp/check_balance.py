@@ -7,7 +7,7 @@ def check():
         print(f"initialize() failed, error code = {mt5.last_error()}")
         return
 
-    account = 336105973
+    account = 336225828
     password = "Hari@123Arun"
     server = "XMGlobal-MT5 9"
 

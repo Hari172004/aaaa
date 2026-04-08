@@ -1,0 +1,100 @@
+{
+  "_comment": "DIY Swing/Hold Config — slower indicators, wider expiry, best for H1/H4/D1 charts",
+  "symbol": "XAUUSD",
+  "timeframe": "M15",
+  "signal_expiry": 8,
+  "alternate_signal": true,
+
+  "leading_indicator": {
+    "name": "RQK",
+    "params": {
+      "lookback": 8.0,
+      "relative_weight": 8.0,
+      "start_bar": 25,
+      "lag": 2
+    }
+  },
+
+  "confirmation_filters": [
+    {
+      "name": "range_filter",
+      "enabled": true,
+      "params": {}
+    },
+    {
+      "name": "wae",
+      "enabled": true,
+      "params": {
+        "sensitivity": 100,
+        "fast_ema": 13,
+        "slow_ema": 34,
+        "bb_length": 20,
+        "bb_mult": 2.0,
+        "deadzone_rma": 100,
+        "deadzone_mult": 3.7
+      }
+    },
+    {
+      "name": "adx",
+      "enabled": true,
+      "params": {
+        "di_length": 14,
+        "adx_length": 14,
+        "key_level": 25,
+        "mode": "advance"
+      }
+    },
+    {
+      "name": "ssl_channel",
+      "enabled": true,
+      "params": {
+        "period": 20
+      }
+    },
+    {
+      "name": "ema_filter",
+      "enabled": true,
+      "params": {
+        "period": 200
+      }
+    },
+    {
+      "name": "macd",
+      "enabled": true,
+      "params": {
+        "fast_length": 12,
+        "slow_length": 26,
+        "signal_length": 9,
+        "mode": "zero_line"
+      }
+    },
+    {
+      "name": "rsi",
+      "enabled": false,
+      "params": {
+        "rsi_length": 14,
+        "mode": "level",
+        "midline": 50
+      }
+    },
+    {
+      "name": "stochastic",
+      "enabled": false,
+      "params": {
+        "length": 14,
+        "smooth_k": 3,
+        "smooth_d": 3,
+        "mode": "crossover"
+      }
+    },
+    {
+      "name": "cci",
+      "enabled": false,
+      "params": {
+        "length": 20,
+        "upper_band": 100,
+        "lower_band": -100
+      }
+    }
+  ]
+}

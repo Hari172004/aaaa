@@ -1,109 +1,144 @@
 """
-run_bot.py — Local Headless Runner
-==================================
-Use this script to run the bot directly on your PC 
-without needing to connect through the mobile app or localtunnel.
+run_bot.py — Agni-V Gold Bot | XAUUSD Professional Runner
+=========================================================
+Gold-only headless runner. No questions asked — boots instantly.
 """
 
+import os
 import time
 import logging
 import threading
-from core import AgniVBot, BotConfig # type: ignore
+from core import AgniVBot, BotConfig  # type: ignore
+from logger import setup_file_logging  # type: ignore
+from dotenv import load_dotenv         # type: ignore
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
 
 if __name__ == "__main__":
-    import os
-    from dotenv import load_dotenv # type: ignore
-    load_dotenv(override=True)  # Load .env file
+    load_dotenv(override=True)
+
+    # ── File logging (5MB x 3 rotating) ─────────────────────────────────
+    setup_file_logging(log_file="agniv_bot.log", max_bytes=5*1024*1024, backup_count=3)
+
+    # ── Strategy Selection ───────────────────────────────────────────
+    console = Console()
+    console.print(Panel.fit(
+        "[bold gold1]Select Trading Strategy[/]\n"
+        "1. [bold cyan]SCALP[/] (High frequency, shorter timeframes)\n"
+        "2. [bold magenta]HOLD[/]  (Swing trading, longer timeframes)",
+        border_style="blue"
+    ))
     
-    print("Which asset would you like to trade today?")
-    print("[1] Gold (XAUUSD)\n[2] Bitcoin (BTCUSD)\n[3] Both (Default)")
-    choice = input("Enter 1, 2, or 3 [Default 3]: ").strip()
+    choice = Prompt.ask("Choose mode", choices=["1", "2"], default="1")
     
-    selected_assets = "BOTH"
     if choice == "1":
-        selected_assets = "XAUUSD"  # Will be mapped to GAUUSD in core.py
-    elif choice == "2":
-        selected_assets = "BTCUSD"
-    else:
-        selected_assets = "BOTH"
-
-    print("\nSelect your Trading Strategy:")
-    print("[1] ⚡ SCALPER\n[2] 🎯 SWING\n[3] 🤖 AUTO (Default)")
-    strat_choice = input("Enter 1, 2, or 3 [Default 3]: ").strip()
-
-    selected_strategy = "AUTO"
-    if strat_choice == "1":
         selected_strategy = "SCALP"
-    elif strat_choice == "2":
-        selected_strategy = "SWING"
     else:
-        selected_strategy = "AUTO"
+        selected_strategy = "SWING"
 
-    # Load All Config from .env
+    leverage = int(os.getenv("BOT_LEVERAGE", "1000"))
+
+    console.print(f"\n[bold green]✅ Strategy Active:[/] [bold white]{selected_strategy}[/]\n")
+
     config = BotConfig(
-        mode         = os.getenv("BOT_MODE", "REAL"),
-        assets       = selected_assets,
-        strategy     = selected_strategy,
-        risk_pct     = float(os.getenv("BOT_RISK_PCT", "1.0")),
-        mt5_account  = int(os.getenv("MT5_ACCOUNT", "0")),
-        mt5_password = os.getenv("MT5_PASSWORD", ""),
-        mt5_server   = os.getenv("MT5_SERVER", ""),
-        # Prop firm settings (only if mode=FUNDED)
-        firm         = os.getenv("FUNDED_FIRM", "FTMO"),
-        firm_balance = float(os.getenv("FUNDED_BALANCE", "10000")),
-        use_ai_confirmation = os.getenv("USE_AI_CONFIRMATION", "true").lower() == "true",
-        sniper_mode         = os.getenv("SNIPER_MODE", "false").lower() == "true",
+        mode              = os.getenv("BOT_MODE", "REAL"),
+        assets            = "XAUUSD",
+        strategy          = selected_strategy,
+        risk_pct          = float(os.getenv("BOT_RISK_PCT", "2.0")),
+        leverage          = leverage,
+        mt5_account       = int(os.getenv("MT5_ACCOUNT", "0")),
+        mt5_password      = os.getenv("MT5_PASSWORD", ""),
+        mt5_server        = os.getenv("MT5_SERVER", ""),
+        firm              = os.getenv("FUNDED_FIRM", "FTMO"),
+        firm_balance      = float(os.getenv("FUNDED_BALANCE", "10000")),
+        use_ai_confirmation   = os.getenv("USE_AI_CONFIRMATION", "true").lower() == "true",
+        sniper_mode           = os.getenv("SNIPER_MODE", "false").lower() == "true",
+        micro_scalp           = (selected_strategy == "SCALP"),
+        use_diy_strategy      = True,
+        diy_scalp_config      = "diy_scalp_config.json",
+        diy_swing_config      = "diy_swing_config.json",
     )
-    
+
     bot = AgniVBot(config)
 
-    # ── Start Telegram Command Handler ────────────────────────
-    from telegram_bot import TelegramCommandHandler  # type: ignore
-    tg_handler = TelegramCommandHandler(
-        token         = os.getenv("TELEGRAM_BOT_TOKEN", ""),
-        owner_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").split(",")[0].strip(),
-        allowed_ids   = os.getenv("TELEGRAM_ALLOWED_IDS", os.getenv("TELEGRAM_CHAT_ID", "")),
-    )
-    tg_handler.set_bot(bot)
-    tg_handler.start()
+    # ── Telegram command handler ─────────────────────────────────────────
+    try:
+        from telegram_bot import TelegramCommandHandler  # type: ignore
+        tg_handler = TelegramCommandHandler(
+            token         = os.getenv("TELEGRAM_BOT_TOKEN", ""),
+            owner_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").split(",")[0].strip(),
+            allowed_ids   = os.getenv("TELEGRAM_ALLOWED_IDS", os.getenv("TELEGRAM_CHAT_ID", "")),
+        )
+        tg_handler.set_bot(bot)
+        tg_handler.start()
+        bot.alerts.telegram_chat_id = ",".join(tg_handler.subscribers)
+        tg_enabled = True
+    except Exception as e:
+        logging.warning(f"[Startup] Telegram handler skipped: {e}")
+        tg_handler = None
+        tg_enabled = False
 
-    # Override the alert chat ID so new /start subscribers receive signals too
-    bot.alerts.telegram_chat_id = ",".join(tg_handler.subscribers)
-
-    # Start the bot in a background thread so we can maintain the Telegram sync loop
+    # ── Start bot main loop ──────────────────────────────────────────────
     bot_thread = threading.Thread(target=bot.start, daemon=True, name="AgniVCore")
     bot_thread.start()
 
-    # 2. Notify user bot is ON (Non-blocking)
-    def _async_startup_notify():
-        asset_label    = {"XAUUSD": "Gold 🥇", "BTCUSD": "Bitcoin ₿", "BOTH": "Gold 🥇 + Bitcoin ₿"}.get(selected_assets, selected_assets)
-        strat_label    = {"SCALP": "⚡ SCALPER (M1/M5)", "SWING": "🎯 SWING (H1/H4)", "AUTO": "🤖 AUTO-PILOT"}.get(selected_strategy, selected_strategy)
-        startup_msg    = (
-            f"🟢 <b>Agni-V Bot ONLINE</b>\n"
-            f"{'─' * 28}\n"
-            f"📈 Asset:    <code>{asset_label}</code>\n"
-            f"🎯 Strategy: <code>{strat_label}</code>\n"
-            f"⚙️ Mode:     <code>{config.mode}</code>\n"
-            f"🔫 Sniper:   <code>{'ON' if config.sniper_mode else 'OFF'}</code>\n\n"
-            f"Live signals active! 🚀🎯"
+    # ── Startup Telegram notification ────────────────────────────────────
+    def _startup_notify():
+        strat_label = {"SCALP": "⚡ SCALP (M5 · DIY Builder)", "SWING": "🎯 SWING (H4 · DIY Builder)"}.get(
+            selected_strategy, selected_strategy
         )
-        time.sleep(2) # Give components time to breathe
+        time.sleep(2)
         try:
-            bot.alerts.send_telegram(startup_msg)
-        except:
+            bot.alerts.send_telegram(
+                f"🟢 <b>Agni-V Gold Bot ONLINE</b>\n"
+                f"{'─' * 32}\n"
+                f"📈 Asset:     <code>XAUUSD (Gold)</code>\n"
+                f"🎯 Strategy:  <code>{strat_label}</code>\n"
+                f"⚙️  Mode:      <code>{config.mode}</code>\n"
+                f"📦 Pyramid:   <code>Up to 5 orders on strong signals</code>\n"
+                f"🔫 Sniper:    <code>{'ON' if config.sniper_mode else 'OFF'}</code>\n\n"
+                f"Live Gold signals active! 🚀🥇"
+            )
+        except Exception:
             pass
 
-    threading.Thread(target=_async_startup_notify, daemon=True).start()
+    threading.Thread(target=_startup_notify, daemon=True).start()
 
-    logging.info(f"Bot is running locally! Mode: {config.mode} | Assets: {config.assets}")
-    
+    # ── Heartbeat every 30 minutes ───────────────────────────────────────
+    _start_time = time.time()
+
+    def _heartbeat_loop():
+        time.sleep(60)
+        while True:
+            try:
+                info       = bot._get_balance()
+                bal        = float(info.get("balance", 0.0))
+                risk_stats = bot.gold_risk.stats()
+                pnl        = float(risk_stats.get("daily_profit", 0.0)) - float(risk_stats.get("daily_loss", 0.0))
+                open_pos   = bot._get_open_positions()
+                trades     = len(open_pos) if open_pos else 0
+                uptime     = int((time.time() - _start_time) / 60)
+                bot.alerts.send_heartbeat(
+                    balance=bal, open_trades=trades,
+                    today_pnl=pnl, uptime_mins=uptime,
+                )
+            except Exception as e:
+                logging.warning(f"[Heartbeat] {e}")
+            time.sleep(30 * 60)
+
+    threading.Thread(target=_heartbeat_loop, daemon=True, name="Heartbeat").start()
+
+    logging.info(f"[Startup] Agni-V Gold Bot running | Mode={config.mode} | Strategy={selected_strategy}")
+
+    # ── Keep alive ───────────────────────────────────────────────────────
     try:
         while True:
-            # Keep subscriber list in sync with alert manager
-            if tg_handler.subscribers:
+            if tg_enabled and tg_handler and tg_handler.subscribers:
                 bot.alerts.telegram_chat_id = ",".join(tg_handler.subscribers)
             time.sleep(5)
     except KeyboardInterrupt:
-        logging.info("Stopping Bot...")
-        tg_handler.stop()
+        logging.info("Stopping Agni-V Gold Bot...")
+        if tg_enabled and tg_handler:
+            tg_handler.stop()
         bot.stop()
