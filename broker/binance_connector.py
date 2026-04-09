@@ -1,7 +1,7 @@
 """
 binance_connector.py — Binance WebSocket Client for BTC
 =======================================================
-Provides real-time price, volume, and trade updates for BTCUSDT.
+Provides real-time price, volume, and trade updates for Gold.
 Used for instantaneous scalping triggers.
 """
 
@@ -20,7 +20,7 @@ class BinanceConnector:
     Stream: btc_usdt@ticker or btc_usdt@aggTrade
     """
 
-    def __init__(self, symbol: str = "BTCUSDT"):
+    def __init__(self, symbol: str = "XAUUSDT"):
         self.symbol = symbol.lower()
         self.ws_url = f"wss://stream.binance.com:9443/ws/{self.symbol}@ticker"
         self.ws: Optional[websocket.WebSocketApp] = None
@@ -74,7 +74,7 @@ class BinanceConnector:
                 "volume": float(data.get("v", 0)),
                 "high": float(data.get("h", 0)),
                 "low": float(data.get("l", 0)),
-                "symbol": data.get("s", "BTCUSDT"),
+                "symbol": data.get("s", "XAUUSDT"),
                 "ts": data.get("E", time.time()*1000)
             }
         except Exception as e:

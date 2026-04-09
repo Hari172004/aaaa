@@ -10,7 +10,6 @@ from typing import Optional
 logger = logging.getLogger("agniv.ccxt")
 
 SYMBOL_MAP = {
-    "BTCUSD":  "BTC/USDT",
     "XAUUSD":  "XAU/USDT",  # If exchange supports it
 }
 

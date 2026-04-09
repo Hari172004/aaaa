@@ -80,5 +80,3 @@ if __name__ == "__main__":
     # Train Gold
     retrain_from_csv("XAUUSD")
     
-    # Train BTC
-    retrain_from_csv("BTCUSD")

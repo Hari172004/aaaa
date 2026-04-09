@@ -19,7 +19,7 @@ def download_history(symbol: str, timeframe: str = "D1", start_year: int = 2001)
     
     # Try to find the exact symbol name if not found
     if not mt5.symbol_select(mt5_symbol, True): # type: ignore
-        candidates = [symbol, symbol+".a", symbol+"m", "GOLD" if "XAU" in symbol else "BITCOIN", "BTCUSD"]
+        candidates = [symbol, symbol+".a", symbol+"m", "GOLD" if "XAU" in symbol else "XAUUSD"]
         for cand in candidates:
             if mt5.symbol_select(cand, True): # type: ignore
                 mt5_symbol = cand
@@ -61,6 +61,6 @@ if __name__ == "__main__":
     download_history("XAUUSD", "D1", 2001)
     
     # Download BTC (2015+)
-    download_history("BTCUSD", "D1", 2015)
+
     
     mt5.shutdown() # type: ignore

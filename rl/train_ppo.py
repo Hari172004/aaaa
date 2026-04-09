@@ -1,16 +1,15 @@
 """
 rl/train_ppo.py — Standalone PPO Training Script
 ==================================================
-Trains separate PPO models for Gold (XAUUSD) and BTC (BTCUSD).
+Trains separate PPO models for Gold (XAUUSD).
 
 Usage (from project root):
     python rl/train_ppo.py --symbol XAUUSD
-    python rl/train_ppo.py --symbol BTCUSD
     python rl/train_ppo.py               # trains both
 
 Output:
     rl/XAUUSD_ppo.zip
-    rl/BTCUSD_ppo.zip
+
 """
 
 import argparse
@@ -38,8 +37,7 @@ SYMBOL_CSV_MAP = {
 
 DEFAULT_TIMESTEPS = {
     "XAUUSD": 300_000,    # Gold: longer training for more nuanced regime detection
-    "BTCUSD": 200_000,    # BTC: faster price action, fewer timesteps needed
-}
+    "XAUUSD": 300_000,    # Gold: longer training for more nuanced regime detection
 
 
 def load_data(symbol: str) -> pd.DataFrame:
@@ -77,9 +75,8 @@ def main():
     parser = argparse.ArgumentParser(description="Train PPO agents for Agni-V Scalp Sniper")
     parser.add_argument(
         "--symbol",
-        choices=["XAUUSD", "BTCUSD"],
-        default=None,
-        help="Symbol to train (default: trains both XAUUSD and BTCUSD)"
+        choices=["XAUUSD"],
+        help="Symbol to train (default: trains XAUUSD)"
     )
     parser.add_argument(
         "--timesteps",
@@ -89,7 +86,7 @@ def main():
     )
     args = parser.parse_args()
 
-    symbols = [args.symbol] if args.symbol else ["XAUUSD", "BTCUSD"]
+    symbols = [args.symbol] if args.symbol else ["XAUUSD"]
 
     results = {}
     for sym in symbols:

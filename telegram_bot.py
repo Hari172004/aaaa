@@ -226,7 +226,7 @@ class TelegramCommandHandler:
         msg = (
             f"🚀 <b>Welcome, @{username}!</b>\n"
             f"{'─' * 30}\n"
-            f"🥇 <b>Agni-V Gold &amp; BTC Sniper</b>\n\n"
+            f"🥇 <b>Agni-V Gold Sniper</b>\n\n"
             f"✅ You are <b>subscribed</b> to live signals.\n\n"
             f"<b>Commands:</b>\n"
             f"  /status — Bot status &amp; balance\n"
@@ -358,7 +358,7 @@ class TelegramCommandHandler:
                 "✅ <b>Access Approved!</b>\n\n"
                 "Welcome to Agni-V by Antegravity.\n"
                 "🚀 You now have full signal access.\n"
-                "📊 XAUUSD and BTC signals active.\n"
+                "📊 XAUUSD signals active.\n"
                 "⚡ Trade at the top. Always."
             )
             

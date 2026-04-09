@@ -24,8 +24,8 @@ class CorrelationEngine:
         Returns {"safe": True, "reason": ""} if safe to trade.
         Returns {"safe": False, "reason": "DXY trending opposite..."} if blocked.
         """
-        # We only really care about correlation blocks for XAUUSD and BTCUSD
-        if symbol not in ["XAUUSD", "BTCUSD"]:
+        # We only really care about correlation blocks for XAUUSD
+        if symbol not in ["XAUUSD"]:
             return {"safe": True, "reason": f"No fixed correlation guard for {symbol}"}
 
         try:
@@ -70,13 +70,6 @@ class CorrelationEngine:
                 elif direction == "SELL" and dxy_is_bearish:
                     return {"safe": False, "reason": "DXY is strongly Bearish. Blocking XAUUSD SELL."}
             
-            # BTCUSD correlation is weaker, but generally inverse as well
-            if symbol == "BTCUSD":
-                if direction == "BUY" and dxy_is_bullish:
-                    return {"safe": False, "reason": "DXY is strongly Bullish. Blocking BTCUSD BUY."}
-                elif direction == "SELL" and dxy_is_bearish:
-                    return {"safe": False, "reason": "DXY is strongly Bearish. Blocking BTCUSD SELL."}
-
             return {"safe": True, "reason": f"DXY momentum supports {symbol} {direction}."}
 
         except Exception as e:

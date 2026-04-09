@@ -281,7 +281,7 @@ class AgniVBot:
         # Use getattr(self, 'attr', None) to avoid AttributeErrors if startup failed 
         # or if specific assets (BTC/Gold) weren't initialized.
         components_to_stop = [
-            'btc_binance', 'btc_bybit', 'ccxt', 'mt5', 'news'
+            'ccxt', 'mt5', 'news'
         ]
         
         for comp_name in components_to_stop:

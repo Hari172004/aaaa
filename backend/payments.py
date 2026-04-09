@@ -26,8 +26,8 @@ PLAN_PRICES = {
 
 PLAN_FEATURES = {
     "STARTER": {"modes": ["DEMO", "REAL"],               "assets": ["XAUUSD"]},
-    "PRO":     {"modes": ["DEMO", "REAL", "FUNDED"],     "assets": ["XAUUSD", "BTCUSD"]},
-    "ELITE":   {"modes": ["DEMO", "REAL", "FUNDED"],     "assets": ["XAUUSD", "BTCUSD"], "priority": True},
+    "PRO":     {"modes": ["DEMO", "REAL", "FUNDED"],     "assets": ["XAUUSD"]},
+    "ELITE":   {"modes": ["DEMO", "REAL", "FUNDED"],     "assets": ["XAUUSD"], "priority": True},
 }
 
 

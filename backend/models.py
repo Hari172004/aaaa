@@ -22,7 +22,7 @@ class StrategyMode(str, Enum):
 
 class AssetMode(str, Enum):
     XAUUSD = "XAUUSD"
-    BTCUSD = "BTCUSD"
+
     BOTH   = "BOTH"
 
 

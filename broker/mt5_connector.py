@@ -22,7 +22,6 @@ TIMEFRAME_MAP = {
 # Symbol mapping: internal name → MT5 symbol name
 SYMBOL_MAP = {
     "XAUUSD": "XAUUSD",
-    "BTCUSD": "BTCUSD",
 }
 
 
@@ -47,15 +46,15 @@ class MT5Connector:
 
     def auto_discover_symbols(self):
         """
-        Scans broker's available symbols and maps generic 'XAUUSD' and 'BTCUSD'
-        to their exact broker-specific names (e.g., 'XAUUSD.a', 'GOLD', 'BTCUSDm').
+        Scans broker's available symbols and maps generic 'XAUUSD'
+        to their exact broker-specific names (e.g., 'XAUUSD.a', 'GOLD').
         """
         all_symbols = mt5.symbols_get()  # type: ignore
         if not all_symbols:
             return
 
         gold_candidates = ["GOLD", "gold", "XAUUSD", "XAUUSDm", "GAUUSD", "XAUUSD.a", "XAUUSD.r", "XAUUSD.pro"]
-        btc_candidates  = ["BTCUSD", "BTCUSDT", "BITCOIN", "BTCUSD.a", "BTCUSDm", "BTCUSD.pro"]
+
 
         available_names = [s.name.upper() for s in all_symbols]
         raw_names = [s.name for s in all_symbols]
@@ -70,14 +69,6 @@ class MT5Connector:
                 logger.info(f"[Broker] Universal Mapper: mapped XAUUSD -> {exact_name}")
                 break
 
-        # Map BTC
-        for cand in btc_candidates:
-            if cand.upper() in available_names:
-                exact_name = raw_names[available_names.index(cand.upper())]
-                mt5.symbol_select(exact_name, True)  # type: ignore
-                SYMBOL_MAP["BTCUSD"] = exact_name
-                logger.info(f"[Broker] Universal Mapper: mapped BTCUSD -> {exact_name}")
-                break
 
     def disconnect(self):
         mt5.shutdown()  # type: ignore
@@ -226,5 +217,4 @@ class MT5Connector:
         if info is None:
             return 10.0  # fallback
         # For XAUUSD: 1 pip = 0.01, contract size typically 100
-        # For BTCUSD: varies
-        return info.trade_tick_value * lot
+return info.trade_tick_value * lot

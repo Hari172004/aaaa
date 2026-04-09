@@ -1,7 +1,7 @@
 """
 bybit_connector.py — Bybit WebSocket Client for BTC (Backup)
 ===========================================================
-Provides real-time price and volume updates for BTCUSDT from Bybit.
+Provides real-time price and volume updates for Gold from Bybit.
 Acts as a failover if Binance is unreachable.
 """
 
@@ -17,10 +17,10 @@ logger = logging.getLogger("agniv.bybit")
 class BybitConnector:
     """
     Connects to Bybit Public WebSocket Streams (V5).
-    Stream: publicV5/tickers.BTCUSDT
+    Stream: publicV5/tickers.XAUUSDT
     """
 
-    def __init__(self, symbol: str = "BTCUSDT"):
+    def __init__(self, symbol: str = "XAUUSDT"):
         self.symbol = symbol.upper()
         self.ws_url = "wss://stream.bybit.com/v5/public/spot"
         self.ws: Optional[websocket.WebSocketApp] = None
@@ -82,7 +82,7 @@ class BybitConnector:
                     "volume": float(ticker.get("volume24h", 0)),
                     "high": float(ticker.get("highPrice24h", 0)),
                     "low": float(ticker.get("lowPrice24h", 0)),
-                    "symbol": ticker.get("symbol", "BTCUSDT"),
+                    "symbol": ticker.get("symbol", "XAUUSDT"),
                     "ts": data.get("ts", time.time()*1000)
                 }
         except Exception as e:

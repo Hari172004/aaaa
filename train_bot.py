@@ -68,11 +68,6 @@ if __name__ == "__main__":
     success, acc = gold_ml.train_model(df_gold)
     print(f"Gold Training Outcome: {'SUCCESS' if success else 'FAILED'} (Accuracy: {acc:.1%})\n")
     
-    # 2. Train BTC
-    print("--- 🪙 TRAINING BTCUSD MODEL ---")
-    df_btc = generate_training_data("BTCUSD", 3000)
-    btc_ml = SignalClassifier("BTCUSD")
-    success2, acc2 = btc_ml.train_model(df_btc)
-    print(f"BTC Training Outcome: {'SUCCESS' if success2 else 'FAILED'} (Accuracy: {acc2:.1%})\n")
     
+
     print("Optimization Loop Complete. AI Modules Ready.")

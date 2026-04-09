@@ -35,7 +35,6 @@ logger = logging.getLogger("agniv.history")
 # Map internal symbol names → yfinance tickers
 SYMBOL_MAP: dict[str, str] = {
     "XAUUSD": "GC=F",
-    "BTCUSD": "BTC-USD",
 }
 
 # Map internal timeframe → (yfinance interval, yfinance period for initial load)
