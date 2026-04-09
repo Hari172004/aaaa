@@ -1,7 +1,7 @@
 """
 correlation.py — Dynamic Inter-market Correlation Engine
 ==========================================================
-Verifies that the bot doesn't trade XAUUSD or BTCUSD against 
+Verifies that the bot doesn't trade XAUUSD against 
 the macroeconomic sentiment of the US Dollar Index (DXY).
 
 If DXY is spiking up -> Block XAUUSD BUYS.

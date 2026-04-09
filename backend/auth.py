@@ -47,7 +47,7 @@ def require_valid_license(user: Optional[dict] = None, user_id: Optional[str] = 
 
 
 def require_pro_or_elite(user: dict) -> str:
-    """Require Pro or Elite plan (for funded mode and BTC access)."""
+    """Require Pro or Elite plan (for funded mode)."""
     plan = require_valid_license(user=user)
     if plan not in ("PRO", "ELITE"):
         raise HTTPException(

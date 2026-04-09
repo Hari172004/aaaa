@@ -1,6 +1,5 @@
-"""
-bybit_connector.py — Bybit WebSocket Client for BTC (Backup)
-===========================================================
+bybit_connector.py — Bybit WebSocket Client for XAU/USDT
+=======================================================
 Provides real-time price and volume updates for Gold from Bybit.
 Acts as a failover if Binance is unreachable.
 """
