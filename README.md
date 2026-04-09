@@ -8,17 +8,17 @@
 
 Agni-V has been entirely rebuilt into a hardened, high-performance XAUUSD trading engine:
 
-*   **100% Gold Focus:** Optimized exclusively for XAUUSD structure and liquidity. (Legacy BTC/Crypto support removed).
-*   **DIY Custom Strategy Builder (ZP v1):** 
-    *   `SCALP` mode: Fast M1 execution using Range Filter + RQK Trend Kernel + WAE momentum + ADX.
-    *   `SWING` mode: Broader H4 execution using Supertrend confirmation.
-*   **Machine Learning Filtering:** AI classification model validates signals with a confidence percentage before execution.
-*   **World Monitor API & News Guard:** Automatically tracks global macroeconomic data and pauses trading during High-Impact (Red Folder) news.
-*   **London Bullion Market (LBMA) AI:** Automatically dodges high-manipulation MT5 manipulation windows around the AM/PM Gold Fix (unless in manual override).
-*   **Anti-Martingale Compounding Risk:** Dynamically grows position sizing as account balance grows. 
+* **100% Gold Focus:** Optimized exclusively for XAUUSD structure and liquidity. (Legacy BTC/Crypto support removed).
+* **Aggressive Pyramid Scaling:** Automatically scales up to 5 compounded layers on extreme intra-bar momentum spikes.
+* **Macro-Aware Killswitches:** Automatically blocks trading exactly 45 minutes before major news (CPI, NFP, FOMC) via ForexFactory RSS.
+* **RL-Powered Vetting:** Sub-second Proximal Policy Optimization (PPO) signal vetting running locally to assess trade win probability based on market regime.
+* **World Monitor API:** Scrapes geopolitical escalation events globally to pause trading.
+* **Anti-Martingale:** Halves the risk after maximum successive hits.
+* **Dynamic Spread Locks:** Cuts order transmission if broker raw spreads diverge > 20 points.
+* **Anti-Martingale Compounding Risk:** Dynamically grows position sizing as account balance grows. 
     *   *$10 Nano/Micro Accounts fully supported via structured dynamic tiers.*
     *   1.5x Reward-to-Risk ratio locked in for scalps, ensuring a ~40% win-rate breakeven mathematically.
-*   **Live Telegram Control center:** Subscribed users get automatic heartbeat reports, entry/exit pings, PnL updates, and live command executions.
+* **Live Telegram Control center:** Subscribed users get automatic heartbeat reports, entry/exit pings, PnL updates, and live command executions.
 
 ---
 

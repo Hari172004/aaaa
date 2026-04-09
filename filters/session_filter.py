@@ -48,6 +48,7 @@ class SessionFilter:
         1. Asian Session for Gold (22:00 to 06:00 GMT)
         2. Sunday first 2 hours (21:00 to 23:00 GMT depending on DST)  — Gold only
         3. Friday close (21:30 to 22:00 GMT)                           — Gold only
+        """
         now_gmt = datetime.now(self.gmt_tz)
         current_time = now_gmt.time()
         weekday = now_gmt.weekday()

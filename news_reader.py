@@ -115,7 +115,7 @@ class NewsReader:
 
     def _is_relevant(self, text: str) -> bool:
         text_l = text.lower()
-        return any(kw in text_l for kw in RELEVANT_KEYWORDS)
+        return any(kw in text_l for kw in MACRO_KEYWORDS)
 
     def get_sentiment(self, symbol: str = "XAUUSD") -> dict:
         """
