@@ -264,6 +264,8 @@ class AgniVBot:
         self.news.start_background_refresh()
         logger.info("[Core] News sentiment engine started.")
 
+        self.alerts.send_telegram("🟢 <b>Agni-V Bot ONLINE</b>\nBot activated! Monitoring XAUUSD.")
+
         self._running = True
 
         try:

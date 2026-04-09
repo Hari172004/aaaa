@@ -24,6 +24,7 @@ python-multipart
 python-jose[cryptography]
 passlib[bcrypt]
 httpx
+slowapi
 
 # ── Scheduling & Utils ────────────────────────────────────────
 apscheduler

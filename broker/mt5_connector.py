@@ -217,4 +217,4 @@ class MT5Connector:
         if info is None:
             return 10.0  # fallback
         # For XAUUSD: 1 pip = 0.01, contract size typically 100
-return info.trade_tick_value * lot
+        return info.trade_tick_value * lot
