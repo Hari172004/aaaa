@@ -1,7 +1,7 @@
 """
 session_filter.py — Strict Kill Zone & Liquidity Enforcement (Gold Only)
 Blocks Gold trades outside of precise algorithmic time windows to avoid fakeouts and dead markets.
-BTC trades 24/7 and is exempt from all session filtering.
+
 """
 
 import logging
@@ -22,14 +22,7 @@ class SessionFilter:
             return start <= t or t <= end
 
     def is_kill_zone_active(self, symbol: str) -> bool:
-        """Checks if current GMT time falls inside the allowed Kill Zones.
-        BTC is 24/7 and always returns True. Kill zone enforcement is Gold-only.
-        """
-        is_btc = "BTC" in symbol.upper() or "BITCOIN" in symbol.upper()
-        if is_btc:
-            # BTC trades 24/7 — no session restrictions
-            return True
-
+        """Checks if current GMT time falls inside the allowed Kill Zones."""
         now_gmt = datetime.now(self.gmt_tz)
         current_time = now_gmt.time()
 
@@ -55,13 +48,6 @@ class SessionFilter:
         1. Asian Session for Gold (22:00 to 06:00 GMT)
         2. Sunday first 2 hours (21:00 to 23:00 GMT depending on DST)  — Gold only
         3. Friday close (21:30 to 22:00 GMT)                           — Gold only
-        BTC is 24/7 and is always considered liquidity-safe.
-        """
-        is_btc = "BTC" in symbol.upper() or "BITCOIN" in symbol.upper()
-        if is_btc:
-            # BTC trades 24/7 — always liquid
-            return True
-
         now_gmt = datetime.now(self.gmt_tz)
         current_time = now_gmt.time()
         weekday = now_gmt.weekday()

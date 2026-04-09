@@ -28,7 +28,6 @@ Agni-V has been entirely rebuilt into a hardened, high-performance XAUUSD tradin
 c:/project/bot/
 ├── core.py                     → Main execution engine & lifecycle pipeline
 ├── run_bot.py                  → The startup script & Telegram long-polling loop
-├── risk_manager.py             → Outdated BTC limit manager (Deprecated)
 ├── gold_risk_manager.py        → New Advanced Risk Manager / Compounding engine
 ├── logger.py                   → Unified logging & Telegram broadcaster
 ├── broker/

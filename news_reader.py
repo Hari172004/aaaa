@@ -20,9 +20,9 @@ logger = logging.getLogger("agniv.news")
 FOREXFACTORY_RSS = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
 NEWSAPI_ENDPOINT = "https://newsapi.org/v2/everything"
 
-# Keywords that affect XAUUSD and BTC
-RELEVANT_KEYWORDS = [
-    "gold", "xau", "bitcoin", "btc", "crypto", "fed", "inflation", "interest rate",
+# Keywords that affect XAUUSD
+MACRO_KEYWORDS = [
+    "gold", "xau", "fed", "inflation", "interest rate",
     "cpi", "nfp", "fomc", "usd", "dollar", "central bank", "risk off", "safe haven",
     "recession", "quantitative", "jerome powell", "bank of england", "ecb"
 ]
@@ -119,7 +119,7 @@ class NewsReader:
 
     def get_sentiment(self, symbol: str = "XAUUSD") -> dict:
         """
-        Aggregate sentiment for XAUUSD or BTCUSD from recent articles.
+        Aggregate sentiment for XAUUSD from recent articles.
         Returns:
             {
               'label':  'BULLISH' | 'BEARISH' | 'NEUTRAL',

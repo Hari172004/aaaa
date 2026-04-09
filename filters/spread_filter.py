@@ -1,6 +1,6 @@
 """
 spread_filter.py — Strict Spread Limiter
-Blocks trades unconditionally if spread spikes beyond tolerance (Gold <= 20 pips, BTC <= 0.05%).
+Blocks trades unconditionally if spread spikes beyond tolerance (Gold <= 20 pips).
 """
 
 import logging
@@ -8,9 +8,8 @@ import logging
 logger = logging.getLogger("agniv.filters.spread")
 
 class SpreadFilter:
-    def __init__(self, gold_max_pips: int = 20, btc_max_pct: float = 0.05):
+    def __init__(self, gold_max_pips: int = 20):
         self.gold_max_pips = gold_max_pips
-        self.btc_max_pct = btc_max_pct
 
     def check_spread(self, symbol: str, bid: float, ask: float) -> bool:
         """
@@ -21,7 +20,7 @@ class SpreadFilter:
 
         spread = ask - bid
         is_xau = "XAU" in symbol.upper() or "GOLD" in symbol.upper()
-        is_btc = "BTC" in symbol.upper() or "BITCOIN" in symbol.upper()
+
 
         if is_xau:
             # Gold MT5 tick resolution is typically 1 pip = 0.01
@@ -32,17 +31,6 @@ class SpreadFilter:
                 return False
             else:
                 logger.debug(f"[SPREAD] {symbol} Spread safe: {spread_pips:.1f} pips.")
-                return True
-
-        if is_btc:
-            # BTC spread logic is based on percentage of asset price
-            # E.g., if price = $100,000, 0.05% = $50 maximum spread
-            spread_pct = (spread / ask) * 100
-            if spread_pct > self.btc_max_pct:
-                logger.warning(f"[SPREAD] {symbol} Spread spiked! Current: {spread_pct:.3f}%. Limit: {self.btc_max_pct}%. Blocked.")
-                return False
-            else:
-                logger.debug(f"[SPREAD] {symbol} Spread safe: {spread_pct:.3f}%.")
                 return True
 
         # Default naive safeguard for unknown assets

@@ -132,6 +132,5 @@ class RangeFilter:
         }
 
 
-# Singleton instances — one for BTC, one for Gold
-btc_range_filter  = RangeFilter(period=100, multiplier=3.0)
-gold_range_filter = RangeFilter(period=50,  multiplier=2.5)
+# Singleton instance for Gold
+gold_range_filter = RangeFilter(period=100, multiplier=3.0)

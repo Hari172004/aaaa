@@ -129,6 +129,5 @@ class SupertrendFilter:
         }
 
 
-# Singleton instances
-btc_supertrend  = SupertrendFilter(period=10, multiplier=3.0)
-gold_supertrend = SupertrendFilter(period=10, multiplier=2.5)
+# Gold Singleton
+gold_supertrend = SupertrendFilter(period=10, multiplier=3.0)

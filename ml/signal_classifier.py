@@ -125,4 +125,4 @@ class SignalClassifier:
             logger.error(f"[ML] Prediction failed: {e}")
             return {"trade_allowed": False, "confidence": 0.0}
 
-# To use: btc_ml = SignalClassifier('BTCUSD'); gold_ml = SignalClassifier('XAUUSD')
+# To use: gold_ml = SignalClassifier('XAUUSD')
