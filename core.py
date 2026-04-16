@@ -578,6 +578,24 @@ class AgniVBot:
             self.dashboard_state["metrics"]["signal"] = signal
             self.dashboard_state["metrics"]["strength"] = strength
 
+        # ── 6.5 Dynamic Momentum Exit (Opposite Signal Close) ──
+        if final_signal in ("BUY", "SELL"):
+            for pos in self._get_open_positions():
+                raw_type = pos.get("type", -1)
+                pos_dir = "BUY" if raw_type == 0 or str(raw_type).upper() == "BUY" else ("SELL" if raw_type == 1 or str(raw_type).upper() == "SELL" else "UNKNOWN")
+                
+                profit = pos.get("profit", 0.0)
+                ticket = pos.get("ticket")
+                
+                # If opposite signal and trade is in profit, eject!
+                if pos_dir != "UNKNOWN" and pos_dir != final_signal and profit > 0.0:
+                    logger.info(f"[Core] 🚨 OPPOSITE SIGNAL EXIT: Momentum shifted to {final_signal}. Closing {pos_dir} #{ticket or pos.get('id')} in profit (${profit:.2f})!")
+                    if self.config.mode == MODE_DEMO and self.demo_account:
+                        self.demo_account.close_position(pos.get("id"), price_data.get("bid" if pos_dir=="BUY" else "ask", 0))
+                    elif self.mt5.connected and ticket:
+                        self.mt5.close_position(ticket)
+                    self._play_sound("exit")
+
         if final_signal == "HOLD" or strength < 0.5:
             return
 
