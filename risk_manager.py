@@ -57,11 +57,11 @@ class RiskManager:
         """Adjust risk parameters based on account size."""
         if balance < 50:
             self.breakeven_at_r = 0.3  # Nano-Safety: Protect $10 accounts
-            self.max_daily_loss_pct = 20.0 # Increase limit for tiny accounts to avoid instant lock
+            self.max_daily_loss_pct = 100.0 # Unlimited
             logger.info(f"[RiskMgr] NANO balance ({balance}) detected. Breakeven=0.3R, MaxLoss=20%.")
         elif balance < 500:
             self.breakeven_at_r = 0.7 
-            self.max_daily_loss_pct = 10.0
+            self.max_daily_loss_pct = 100.0 # Unlimited
             logger.info(f"[RiskMgr] Low balance ({balance}) detected. Breakeven=0.7R, MaxLoss=10%.")
         else:
             self.breakeven_at_r = 1.0
@@ -132,11 +132,12 @@ class RiskManager:
 
     def should_update_sl(self, entry_price: float, current_price: float,
                          current_sl: float, initial_sl: float, direction: str,
-                         override_breakeven_r: float = None) -> tuple[bool, float]:
+                         override_breakeven_r: float = None,
+                         trail_distance_r: float = 1.0) -> tuple[bool, float]:
         """
         Returns (should_move: bool, new_sl: float).
-        Implements a Trailing Stop Loss. Activates when profit >= 1R (initial SL distance).
-        Once active, it maintains exactly a 1R distance behind the current price.
+        Implements a Trailing Stop Loss. Activates when profit >= threshold.
+        Once active, it secures Break-Even immediately, and then trails behind price.
         """
         # We don't trail if the initial SL is invalid or missing
         if not initial_sl or initial_sl == entry_price:
@@ -150,9 +151,12 @@ class RiskManager:
 
             # Activation at threshold * R profit
             if profit >= (initial_risk * threshold):
-                # Trail by 1R distance behind current price
-                new_sl = current_price - initial_risk
+                # Trail by distance behind current price
+                new_sl = current_price - (initial_risk * trail_distance_r)
+                # Secure Break-Even minimum to prevent losing money
+                new_sl = max(entry_price, new_sl)
                 new_sl = round(float(new_sl), 5) # type: ignore[arg-type]
+                
                 # Only move if it locks in more profit than current SL
                 if new_sl > current_sl:
                     return True, new_sl
@@ -162,8 +166,11 @@ class RiskManager:
             profit = entry_price - current_price
 
             if profit >= (initial_risk * threshold):
-                new_sl = current_price + initial_risk
+                new_sl = current_price + (initial_risk * trail_distance_r)
+                # Secure Break-Even minimum to prevent losing money
+                new_sl = min(entry_price, new_sl)
                 new_sl = round(float(new_sl), 5) # type: ignore[arg-type]
+                
                 # Only move if it locks in more profit than current SL (lower is better for SL in SELL)
                 if new_sl < current_sl:
                     return True, new_sl
@@ -182,33 +189,36 @@ class RiskManager:
         s = self.state
         now = time.time()
 
-        if s.paused:
-            return False, f"Risk pause: {s.pause_reason}"
+        # Pause check DISABLED per user request for Unlimited Mode
+        # if s.paused:
+        #     return False, f"Risk pause: {s.pause_reason}"
 
-        # ── Cooldown Circuit Breaker ───────────────────────────────────────────────
-        if s.cooldown_until > 0:
-            if now < s.cooldown_until:
-                remaining_mins = int((s.cooldown_until - now) / 60)
-                return False, f"Cooldown active — resumes in {remaining_mins} min"
-            else:
-                # Cooldown expired — auto-resume
-                s.cooldown_until = 0.0
-                logger.info("[RiskMgr] ⏰ Cooldown lifted. Trading resumed automatically.")
+        # ── Cooldown Circuit Breaker (DISABLED per user request) ──────────────────────
+        # if s.cooldown_until > 0:
+        #     if now < s.cooldown_until:
+        #         remaining_mins = int((s.cooldown_until - now) / 60)
+        #         return False, f"Cooldown active — resumes in {remaining_mins} min"
+        #     else:
+        #         s.cooldown_until = 0.0
+        #         logger.info("[RiskMgr] ⏰ Cooldown lifted. Trading resumed automatically.")
 
-        if s.consecutive_losses >= self.max_consecutive_losses:
-            reason = f"Max consecutive losses ({self.max_consecutive_losses}) reached — pausing."
-            self._pause(reason)
-            return False, reason
+        # Consecutive Loss Limit DISABLED per user request
+        # if s.consecutive_losses >= self.max_consecutive_losses:
+        #     reason = f"Max consecutive losses ({self.max_consecutive_losses}) reached — pausing."
+        #     self._pause(reason)
+        #     return False, reason
 
         if s.daily_starting_balance > 0:
             daily_loss_pct = (s.daily_loss / s.daily_starting_balance) * 100
-            if daily_loss_pct >= self.max_daily_loss_pct:
-                reason = (
-                    f"Daily max loss reached: {daily_loss_pct:.2f}% "
-                    f"/ limit {self.max_daily_loss_pct}%"
-                )
-                self._pause(reason)
-                return False, reason
+            # Daily SL Limit DISABLED per user request
+            # if daily_loss_pct >= self.max_daily_loss_pct:
+            #     reason = (
+            #         f"Daily max loss reached: {daily_loss_pct:.2f}% "
+            #         f"/ limit {self.max_daily_loss_pct}%"
+            #     )
+            #     self._pause(reason)
+            #     return False, reason
+            pass
 
         return True, "OK"
 
@@ -237,14 +247,14 @@ class RiskManager:
             # Anti-Martingale: shrink size by 20% after each loss, floor at 0.5×
             s.anti_martingale_mult = max(s.anti_martingale_mult * 0.80, 0.50)
             logger.info(f"[RiskMgr] Anti-Martingale: Loss streak {s.consecutive_losses} — next lot ×{s.anti_martingale_mult:.2f}")
-            # Cooldown Circuit Breaker: after N losses, pause for cooldown_minutes
-            if s.consecutive_losses == self.cooldown_losses:
-                cooldown_secs = self.cooldown_minutes * 60
-                s.cooldown_until = time.time() + cooldown_secs
-                logger.warning(
-                    f"[RiskMgr] ⚡ Cooldown triggered after {self.cooldown_losses} losses! "
-                    f"Trading paused for {self.cooldown_minutes} minutes."
-                )
+            # Cooldown Circuit Breaker (DISABLED per user request)
+            # if s.consecutive_losses == self.cooldown_losses:
+            #     cooldown_secs = self.cooldown_minutes * 60
+            #     s.cooldown_until = time.time() + cooldown_secs
+            #     logger.warning(
+            #         f"[RiskMgr] ⚡ Cooldown triggered after {self.cooldown_losses} losses! "
+            #         f"Trading paused for {self.cooldown_minutes} minutes."
+            #     )
         logger.info(
             f"[RiskMgr] Trade result: PnL=${pnl:+.2f} | "
             f"ConsecLosses={s.consecutive_losses} | "
@@ -269,9 +279,11 @@ class RiskManager:
             logger.info("[RiskMgr] Daily reset — pause lifted.")
 
     def _pause(self, reason: str):
-        self.state.paused = True
-        self.state.pause_reason = reason
-        logger.error(f"[RiskMgr] 🚨 TRADING PAUSED: {reason}")
+        # Pause logic DISABLED per user request
+        # self.state.paused = True
+        # self.state.pause_reason = reason
+        # logger.error(f"[RiskMgr] ðŸš¨ TRADING PAUSED: {reason}")
+        pass
 
     def resume(self):
         """Manually resume (e.g. from the app)."""

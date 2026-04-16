@@ -11,9 +11,110 @@ import backtrader as bt
 import backtrader.analyzers as btanalyzers
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
+import numpy as np
 
 logger = logging.getLogger("agniv.backtest")
+
+
+# ──────────────────────────────────────────────────────────────
+# Agni-V Professional Indicators (Backtrader Ports)
+# ──────────────────────────────────────────────────────────────
+
+class RangeFilterInd(bt.Indicator):
+    """Backtrader port of the ZP Range Filter logic."""
+    lines = ('filt', 'up', 'dn')
+    params = (('period', 50), ('mult', 1.0))
+
+    def __init__(self):
+        self.addminperiod(self.params.period)
+
+    def next(self):
+        # Range Filter Calculation
+        # We use a window of close prices to calculate range
+        close_data = self.data.close.get(size=self.params.period)
+        if len(close_data) < self.params.period:
+            return
+
+        # Simple ATR-like range for backtest
+        rng = np.abs(np.diff(close_data)).mean() * self.params.mult
+        
+        prev_filt = self.filt[-1] if len(self.filt) > 0 else self.data.close[0]
+        curr_close = self.data.close[0]
+        
+        if curr_close > prev_filt:
+            self.lines.filt[0] = max(curr_close - rng, prev_filt)
+        else:
+            self.lines.filt[0] = min(curr_close + rng, prev_filt)
+            
+        self.lines.up[0] = 1 if self.lines.filt[0] > self.lines.filt[-1] else 0
+        self.lines.dn[0] = 1 if self.lines.filt[0] < self.lines.filt[-1] else 0
+
+
+class WAEInd(bt.Indicator):
+    """Backtrader port of Waddah Attar Explosion."""
+    lines = ('safe_buy', 'safe_sell')
+    params = (('fast', 20), ('slow', 40), ('bb_len', 20), ('bb_mult', 2.0))
+
+    def __init__(self):
+        macd = bt.ind.EMA(period=self.params.fast) - bt.ind.EMA(period=self.params.slow)
+        self.t1 = (macd - macd(-1)) * 150
+        
+        bb = bt.ind.BollingerBands(period=self.params.bb_len, devfactor=self.params.bb_mult)
+        self.explosion = bb.top - bb.bot
+        
+        # Approximate RMA using simple EMA for the backtest indicator
+        tr = bt.ind.TR() 
+        self.deadzone = bt.ind.EMA(tr, period=100) * 3.7
+
+    def next(self):
+        trend_up   = self.t1[0] if self.t1[0] >= 0 else 0
+        trend_down = abs(self.t1[0]) if self.t1[0] < 0 else 0
+        
+        self.lines.safe_buy[0]  = (trend_up > self.explosion[0] and self.explosion[0] > self.deadzone[0] and trend_up > self.deadzone[0])
+        self.lines.safe_sell[0] = (trend_down > self.explosion[0] and self.explosion[0] > self.deadzone[0] and trend_down > self.deadzone[0])
+
+
+# ──────────────────────────────────────────────────────────────
+# Strategy 3: Agni-V Real Strategy (Range Filter + WAE)
+# ──────────────────────────────────────────────────────────────
+
+class AgniVStrategy(bt.Strategy):
+    params = {
+        "rf_period": 50, "rf_mult": 1.1,
+        "risk_pct": 1.0,
+        "daily_loss_limit_pct": 5.0,
+        "max_drawdown_pct": 10.0,
+    }
+
+    def __init__(self):
+        self.rf  = RangeFilterInd(period=self.p.rf_period, mult=self.p.rf_mult)
+        self.wae = WAEInd()
+        self.order = None
+
+    def next(self):
+        if self.order: return
+        
+        buy_signal  = self.rf.up[0] and self.wae.safe_buy[0]
+        sell_signal = self.rf.dn[0] and self.wae.safe_sell[0]
+        
+        risk_amount = self.broker.getvalue() * (self.p.risk_pct / 100)
+        # Use a fixed 2.5 point SL for sizing. Ensure at least size 1.
+        size = max(1, int(risk_amount / 250)) 
+        
+        if not self.position:
+            if buy_signal:
+                self.order = self.buy(size=size)
+            elif sell_signal:
+                self.order = self.sell(size=size)
+        else:
+            if self.position.size > 0 and self.rf.dn[0]:
+                self.close()
+            elif self.position.size < 0 and self.rf.up[0]:
+                self.close()
+
+    def notify_order(self, order):
+        if order.status in [order.Completed, order.Canceled, order.Rejected]:
+            self.order = None
 
 
 # ──────────────────────────────────────────────────────────────
@@ -187,7 +288,8 @@ def load_data(symbol: str, period: str = "2y", interval: str = "1h") -> bt.feeds
     yf_symbol = ticker_map.get(symbol, symbol)
     logger.info(f"[Backtest] Downloading {yf_symbol} | Period={period} | Interval={interval}")
     df = yf.download(yf_symbol, period=period, interval=interval, progress=False)
-    df.columns = [c.lower() for c in df.columns]  # type: ignore
+    # Lowercase columns and handle yfinance multi-index if present
+    df.columns = [c[0].lower() if isinstance(c, tuple) else c.lower() for c in df.columns] 
     df = df.rename(columns={"adj close": "close"})  # type: ignore
     df = df[["open", "high", "low", "close", "volume"]].dropna()
     feed = bt.feeds.PandasData(dataname=df)  # type: ignore
@@ -217,13 +319,21 @@ def run_backtest(symbol: str = "XAUUSD",
     data = load_data(symbol, period, interval)
     cerebro.adddata(data)
 
-    StratClass = ScalpStrategy if strategy_name == "scalp" else SwingStrategy
+    if strategy_name == "agniv":
+        StratClass = AgniVStrategy
+    else:
+        StratClass = ScalpStrategy if strategy_name == "scalp" else SwingStrategy
+
     cerebro.addstrategy(
         StratClass,
         risk_pct=risk_pct,
         daily_loss_limit_pct=daily_loss_limit_pct,
         max_drawdown_pct=max_drawdown_pct,
     )
+
+    # ── Real Broker Simulation (Spread + Slippage) ──
+    # XAUUSD 0.25 spread = $0.25 between Bid/Ask
+    cerebro.broker.set_slippage_fixed(0.25) 
 
     # Add analyzers
     cerebro.addanalyzer(btanalyzers.SharpeRatio,    _name="sharpe",   riskfreerate=0.02)
@@ -298,7 +408,7 @@ def run_backtest(symbol: str = "XAUUSD",
 if __name__ == "__main__":
     import json
     for sym in ["XAUUSD"]:
-        for strat in ["scalp", "swing"]:
-            result = run_backtest(symbol=sym, strategy_name=strat, period="2y", interval="1h")
+        for strat in ["agniv", "scalp"]:
+            result = run_backtest(symbol=sym, strategy_name=strat, period="1mo", interval="15m")
             print(json.dumps(result, indent=2))
-            print("─" * 60)
+            print("-" * 60)

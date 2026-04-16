@@ -26,7 +26,7 @@ FAILED_LOGINS: Dict[str, Dict] = {}        # { email: {"attempts": int, "locked_
 USER_SESSIONS: Dict[str, Dict] = {}        # { user_id: { session_id: { ... } } }
 DEVICE_REGISTRY: Dict[str, list] = {}      # { user_id: [device_id_1, device_id_2] }
 
-class Agni-VAuth:
+class AgniVAuth:
     def __init__(self, jwt_secret: Optional[str] = None):
         """
         Initializes the authentication module with a secure JWT signing secret.
@@ -261,4 +261,4 @@ class Agni-VAuth:
             logger.info(f"[Auth] Session {session_id} manually logged out.")
 
 # Global instance
-auth_manager = Agni-VAuth()
+auth_manager = AgniVAuth()

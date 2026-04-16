@@ -20,12 +20,14 @@ from backend.models import (
     TradeHistory,
 )
 from backend.auth     import init_firebase, get_current_user, require_valid_license, require_pro_or_elite
+from backend.security.rate_limiter import check_blacklist_middleware # type: ignore
 from backend.database import (
     get_trades, get_trade_stats, get_license, get_all_users,
     get_all_licenses, save_funded_report, get_funded_report,
 )
 from backend.payments  import create_checkout_session, handle_webhook
 from history_store     import HistoryStore, SYMBOL_MAP, TIMEFRAME_MAP
+from backend.security.encryption import kms
 
 _history_store = HistoryStore()
 
@@ -38,6 +40,7 @@ app = FastAPI(
     title="Agni-V API",
     description="Cloud backend for the Agni-V SaaS trading bot platform.",
     version="1.0.0",
+    dependencies=[Depends(check_blacklist_middleware)]
 )
 
 app.add_middleware(
@@ -65,6 +68,34 @@ async def startup():
 def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat(), "service": "agniv-api"}
 
+
+# ── Bot Security Handshake ────────────────────────────────────
+
+def verify_bot_signature(
+    request: Request,
+    signature: str = Header(..., alias="X-Agni-Signature"),
+    timestamp: float = Header(..., alias="X-Agni-Timestamp")
+):
+    """
+    Ensures that sensitive bot commands/status updates are signed
+    by the authorized Agni-V Bot instance.
+    """
+    secret = os.getenv("JWT_SECRET_KEY", "fallback_dev_secret_2026_xyz!@#")
+    
+    # We'll use the URL path as part of the payload to ensure 
+    # the signature is specific to the requested action.
+    payload = request.url.path
+    
+    is_valid = kms.verify_request_signature(
+        payload=payload,
+        secret=secret,
+        provided_signature=signature,
+        provided_ts=timestamp
+    )
+    
+    if not is_valid:
+        logger.error(f"[Security] 🚨 UNAUTHORIZED REQUEST attempt on {payload} | IP: {request.client.host if request.client else '?'}")
+        raise HTTPException(status_code=401, detail="Invalid request signature or stale payload.")
 
 # ── Auth / License ────────────────────────────────────────────
 
@@ -120,7 +151,7 @@ def stop_bot(user: dict = Depends(get_current_user)):
 
 
 @app.get("/bot/status", response_model=BotStatusResponse)
-def bot_status(user: dict = Depends(get_current_user)):
+def bot_status(user: dict = Depends(get_current_user), _sig = Depends(verify_bot_signature)):
     uid = user["uid"]
     bot = _bot_registry.get(uid)
     if not bot:

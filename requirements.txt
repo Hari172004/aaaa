@@ -13,6 +13,7 @@ numpy<2
 scikit-learn
 xgboost
 websocket-client
+rich
 
 # ── Cloud Backend (FastAPI) ───────────────────────────────────
 fastapi

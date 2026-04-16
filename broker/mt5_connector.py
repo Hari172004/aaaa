@@ -3,6 +3,7 @@ mt5_connector.py — MetaTrader 5 Broker Interface
 """
 
 import logging
+import os
 from typing import Optional
 import MetaTrader5 as mt5
 import pandas as pd
@@ -21,7 +22,7 @@ TIMEFRAME_MAP = {
 
 # Symbol mapping: internal name → MT5 symbol name
 SYMBOL_MAP = {
-    "XAUUSD": "XAUUSD",
+    "XAUUSD": os.getenv("GOLD_SYMBOL", "GOLD"),
 }
 
 
@@ -29,15 +30,29 @@ class MT5Connector:
     def __init__(self):
         self.connected = False
 
-    def connect(self, account: int, password: str, server: str) -> bool:
-        if not mt5.initialize():  # type: ignore
-            err = mt5.last_error()
-            logger.error(f"MT5 initialize() failed. Is MetaTrader 5 running? Error: {err}")
-            return False
-        if not mt5.login(account, password=password, server=server):  # type: ignore
-            logger.error(f"MT5 login failed: {mt5.last_error()}")  # type: ignore
-            mt5.shutdown()  # type: ignore
-            return False
+    def connect(self, account: int, password: str, server: str, path: str = "") -> bool:
+        # Resolve terminal path from environment if not provided
+        if not path:
+            path = os.getenv("MT5_PATH", "")
+            
+        # Try initializing with explicit credentials and path if provided
+        init_ok = False
+        if account != 0 and password:
+            init_ok = mt5.initialize(login=account, password=password, server=server, path=path)
+        
+        if not init_ok:
+            # Fallback to default initialization if explicit failed or wasn't tried
+            if not mt5.initialize(path=path):
+                err = mt5.last_error()
+                logger.error(f"MT5 initialize() failed. Path: {path}, Error: {err}")
+                return False
+            
+            # If we initialized but hadn't logged in yet, do it now
+            if account != 0 and password:
+                if not mt5.login(account, password=password, server=server):
+                    logger.error(f"MT5 login failed: {mt5.last_error()}")
+                    mt5.shutdown()
+                    return False
         info = mt5.account_info()  # type: ignore
         logger.info(f"MT5 Connected | #{info.login} | ${info.balance:.2f} | {info.server}")
         self.connected = True
@@ -194,20 +209,32 @@ class MT5Connector:
         return True
 
     def get_closed_trade_info(self, ticket: int) -> dict:
-        """Fetches profit and closing reason for a specific ticket from history."""
-        # Look back 1 hour to find the closing deal
+        """Fetches profit and closing reason for a specific position ticket from history."""
         from datetime import datetime, timedelta
-        from_time = datetime.now() - timedelta(hours=1)
-        deals = mt5.history_deals_get(from_date=from_time, ticket=ticket) # type: ignore
+        # Look back 24 hours to be safe for finding the closing deal
+        from_time = datetime.now() - timedelta(hours=24)
+        
+        # FIX: Use position=ticket to find all deals associated with this position ID
+        deals = mt5.history_deals_get(from_date=from_time, position=ticket) # type: ignore
         
         if deals and len(deals) > 0:
-            # Usually the last deal for a ticket is the closing one or contains the cumulative profit
-            deal = deals[-1]
+            # The deals include entry, possibly partial closes, and the final exit.
+            # We calculate total profit from all deals associated with this position.
+            total_profit = sum(deal.profit for deal in deals)
+            # Find the exit deal to determine the reason (entry out)
+            exit_deal = next((d for d in reversed(deals) if d.entry in [mt5.DEAL_ENTRY_OUT, mt5.DEAL_ENTRY_INOUT]), deals[-1])
+            
+            reason = "Manual/Other"
+            if exit_deal.reason == mt5.DEAL_REASON_SL:
+                reason = "Stop Loss"
+            elif exit_deal.reason == mt5.DEAL_REASON_TP:
+                reason = "Take Profit"
+                
             return {
-                "profit": float(deal.profit),
-                "symbol": deal.symbol,
-                "magic":  deal.magic,
-                "reason": "TP/SL" if deal.reason in [mt5.DEAL_REASON_SL, mt5.DEAL_REASON_TP] else "Manual/Other" # type: ignore
+                "profit": float(total_profit),
+                "symbol": exit_deal.symbol,
+                "reason": reason,
+                "ticket": ticket
             }
         return {}
 

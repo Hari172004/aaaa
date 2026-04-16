@@ -31,7 +31,7 @@ IMPACT_WEIGHT = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}
 
 
 class NewsReader:
-    def __init__(self, newsapi_key: str, fetch_interval_minutes: int = 15):
+    def __init__(self, newsapi_key: str, fetch_interval_minutes: int = 1):
         self.newsapi_key = newsapi_key
         self.fetch_interval = fetch_interval_minutes * 60
         self.vader = SentimentIntensityAnalyzer()

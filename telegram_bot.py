@@ -14,6 +14,7 @@ Supported commands (for authorised users only):
   /start   — Subscribe to signals
   /status  — Get current bot status
   /stop    — Unsubscribe from signals
+  /authorize — Approve bot startup (2FA)
   /help    — List all commands
 
 Admin-only commands:
@@ -201,6 +202,8 @@ class TelegramCommandHandler:
             self._cmd_stop(chat_id, username)
         elif command == "/help":
             self._cmd_help(chat_id, username)
+        elif command == "/authorize" and self._is_admin(chat_id, username):
+            self._cmd_authorize(chat_id)
         # Admin-only commands
         elif command == "/approve" and self._is_admin(chat_id, username):
             parts = full_text.split()
@@ -259,6 +262,18 @@ class TelegramCommandHandler:
         except Exception as e:
             msg = f"⚠️ Could not fetch status: <code>{e}</code>"
         self._send(chat_id, msg)
+
+    def _cmd_authorize(self, chat_id: str):
+        bot = self._bot_ref
+        if bot is None:
+            self._send(chat_id, "⏳ Bot is not yet initialised.")
+            return
+        if hasattr(bot, "_authorized"):
+            bot._authorized.set()
+            self._send(chat_id, "🔓 <b>Agni-V Authorized!</b>\nThe bot is now entering the main trading loop.")
+            logger.info(f"[TGBot] Admin {chat_id} authorized bot startup.")
+        else:
+            self._send(chat_id, "⚠️ Bot does not require 2FA authorization in this mode.")
 
     def _cmd_stop(self, chat_id: str, username: str):
         self._subscribers.discard(chat_id)

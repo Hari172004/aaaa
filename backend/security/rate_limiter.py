@@ -12,8 +12,33 @@ from slowapi.errors import RateLimitExceeded
 
 logger = logging.getLogger("agniv.ratelimit")
 
-# In-memory dictionary tracking repeated abusers (in production, use Redis)
+import json
+import os
+
+# Persistent Blacklist File
+BANS_FILE = "backend/security/bans.json"
+
+# In-memory stores
 ABUSE_RECORDS = {}
+IP_BLACKLIST = set()
+
+def load_blacklist():
+    """Loads banned IPs from the persistence file."""
+    if os.path.exists(BANS_FILE):
+        with open(BANS_FILE, "r") as f:
+            try:
+                data = json.load(f)
+                return set(data)
+            except:
+                return set()
+    return set()
+
+def save_blacklist():
+    """Saves the current blacklist to the persistence file."""
+    with open(BANS_FILE, "w") as f:
+        json.dump(list(IP_BLACKLIST), f)
+
+IP_BLACKLIST = load_blacklist()
 
 # 1. Initialize the global Limiter
 # By default, we use IP address for anonymous requests
@@ -30,10 +55,20 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
     # Track repeated limit hits
     ABUSE_RECORDS[client_ip] = ABUSE_RECORDS.get(client_ip, 0) + 1
     if ABUSE_RECORDS[client_ip] > 5:
-        logger.error(f"[RateLimit] 🚨 IP {client_ip} is repeatedly abusing the API. Blocking required.")
-        # Trigger: Threat detector alert
+        logger.error(f"[RateLimit] 🚨 IP {client_ip} has been PERMANENTLY BANNED for excessive abuse.")
+        IP_BLACKLIST.add(client_ip)
+        save_blacklist()
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied. Your IP is blacklisted.")
         
     return _rate_limit_exceeded_handler(request, exc)
+
+def check_blacklist_middleware(request: Request):
+    """FastAPI dependency to reject blacklisted IPs immediately."""
+    client_ip = request.client.host if request.client else "unknown"
+    if client_ip in IP_BLACKLIST:
+        logger.warning(f"[RateLimit] 🛡️ Blocked request from blacklisted IP: {client_ip}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied. Your IP is blacklisted.")
+
 
 # ── Dynamic Key Functions ───────────────────────────────────────────────────
 

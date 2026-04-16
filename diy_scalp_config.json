@@ -1,22 +1,32 @@
 {
   "_comment": "DIY Scalp Config — fast signals, tight expiry window, best for M1/M5/M15 charts",
-  "symbol": "XAUUSD",
+  "symbol": "GOLD",
   "timeframe": "M1",
-  "signal_expiry": 3,
-  "alternate_signal": true,
+  "alternate_signal": false,
+  "strict_htf_trend": false,
+  "enable_sideways_mode": true,
+  "regime_adx_threshold": 10.0,
+  "sideways_settings": {
+    "lookback_period": 14,
+    "rsi_length": 14,
+    "volume_threshold": 2.0,
+    "divergence_threshold": 0.05,
+    "overbought": 65,
+    "oversold": 35
+  },
 
   "leading_indicator": {
-    "name": "Range Filter",
+    "name": "2 EMA Cross",
     "params": {
-      "period": 50,
-      "multiplier": 1.7
+      "fast": 9,
+      "slow": 21
     }
   },
 
   "confirmation_filters": [
     {
       "name": "rqk",
-      "enabled": true,
+      "enabled": false,
       "params": {
         "lookback": 8.0,
         "relative_weight": 8.0,
@@ -26,7 +36,7 @@
     },
     {
       "name": "wae",
-      "enabled": true,
+      "enabled": false,
       "params": {
         "sensitivity": 150,
         "fast_ema": 20,
@@ -39,7 +49,7 @@
     },
     {
       "name": "adx",
-      "enabled": true,
+      "enabled": false,
       "params": {
         "di_length": 10,
         "adx_length": 5,
@@ -66,10 +76,11 @@
       }
     },
     {
-      "name": "ssl_channel",
+      "name": "supertrend",
       "enabled": false,
       "params": {
-        "period": 10
+        "period": 10,
+        "multiplier": 3.0
       }
     },
     {

@@ -29,8 +29,10 @@ LBMA_FIX_WINDOWS = [
     (14, 16),   # PM fix window (avoid 14:00-16:00 UTC)
 ]
 
-# Pre-news blackout window in minutes
-NEWS_BLACKOUT_MINS = 30
+# Pre-session sniper window (minutes before open)
+PRE_SESSION_BUFFER = 15
+# Session-open "Washout" guard (minutes after open to block)
+WASHOUT_PERIOD     = 5
 
 
 def _utc_hour() -> int:
@@ -79,12 +81,26 @@ def get_current_gold_session() -> dict:
     # Mapping for ML features
     session_map = {"ASIAN": 1, "LONDON": 2, "NEW_YORK": 3, "LATENIGHT": 4}
 
+    # ── Pre-Session Sniper Logic ──
+    # Starts 15 mins before London (6:45) and NY (11:45)
+    is_pre_london = (hour == 6 and minute >= (60 - PRE_SESSION_BUFFER))
+    is_pre_ny     = (hour == 11 and minute >= (60 - PRE_SESSION_BUFFER))
+    is_pre_session = is_pre_london or is_pre_ny
+
+    # ── Session-Open Washout Logic ──
+    # Blocks first 5 mins of London (7:00-7:05) and NY (12:00-12:05)
+    is_washout_london = (hour == 7 and minute < WASHOUT_PERIOD)
+    is_washout_ny     = (hour == 12 and minute < WASHOUT_PERIOD)
+    is_washout = is_washout_london or is_washout_ny
+
     return {
         "session":       session,
         "session_id":    session_map.get(session, 1),
         "utc_hour":      hour,
         "utc_minute":    minute,
         "is_killzone":   is_killzone,
+        "is_pre_session": is_pre_session,
+        "is_washout":    is_washout,
         "active_kz":     active_kz,
         "is_lbma_fix":   is_lbma_fix,
         "is_asian":      session == "ASIAN",
@@ -99,18 +115,22 @@ def get_current_gold_session_simple() -> dict:
 
 def is_gold_scalp_time(ignore_lbma: bool = False, ignore_asian: bool = False) -> bool:
     """
-    True only during London or NY Kill Zone.
-    Scalping is disabled during Asian session and LBMA fix windows unless ignored.
+    True during London/NY Kill Zone OR the Pre-Session window.
     """
     info = get_current_gold_session()
     if info["is_lbma_fix"] and not ignore_lbma:
         logger.info("[Sessions] LBMA fix window active — scalping paused")
         return False
     
-    if info["is_asian"] and not ignore_asian:
+    if info["is_asian"] and not info["is_pre_session"] and not ignore_asian:
         return False
         
-    return info["is_killzone"] or ignore_lbma or ignore_asian
+    return info["is_killzone"] or info["is_pre_session"] or ignore_lbma or ignore_asian
+
+
+def is_washout_period() -> bool:
+    """Returns True during the first 5 minutes of a major session open."""
+    return get_current_gold_session()["is_washout"]
 
 
 def is_lbma_fix_time() -> bool:

@@ -31,17 +31,18 @@ _DAILY_FILE = pathlib.Path("data/daily_gold_stats.json")
 # ── Risk constants ─────────────────────────────────────────────────────────
 MIN_LOT               = 0.01    # absolute minimum lot
 MAX_LOT               = 10.0    # absolute maximum lot per single order
-MAX_OPEN_GOLD_TRADES  = 10      # up to 5-order pyramids so allow 10 max
+MAX_OPEN_GOLD_TRADES  = 30      # up to 10-order pyramids so allow 30 max
 DAILY_LOSS_LIMIT_PCT  = 5.0     # stop trading after 5% daily drawdown
 MAX_SPREAD_POINTS     = 3.0     # 30 pips = 3.0 XAU points — pause if wider
+MAX_TOTAL_PYRAMID_RISK_PCT = 3.5  # Restored Safety Cap for $100 account
 ATR_SPIKE_MULTIPLIER  = 3.5     # reduce size 70% if ATR > 3.5x rolling avg
 MIN_SL_POINTS         = 1.0     # minimum SL distance (10 pips)
 
 # News blackout window around high-impact events
 NEWS_BLACKOUT_MINS = 30
 
-# Pyramid order lot weighting (% of base_lot per order number 1–5)
-PYRAMID_WEIGHTS = [1.0, 0.75, 0.50, 0.35, 0.25]
+# Pyramid order lot weighting (% of base_lot per order number 1–10)
+PYRAMID_WEIGHTS = [1.0, 0.75, 0.50, 0.35, 0.25, 0.20, 0.15, 0.10, 0.10, 0.10]
 
 
 # ── Persistent helpers ────────────────────────────────────────────────────
@@ -141,14 +142,14 @@ class GoldRiskManager:
             return {"name": "NANO",    "risk_pct": 3.0, "max_orders": 5}
         elif balance < 50:
             return {"name": "MICRO",   "risk_pct": 4.0, "max_orders": 5}
-        elif balance < 200:
-            return {"name": "STARTER", "risk_pct": 3.5, "max_orders": 5}
+        elif balance < 100:
+            return {"name": "STARTER", "risk_pct": 3.5, "max_orders": 7}
         elif balance < 500:
-            return {"name": "GROWTH",  "risk_pct": 2.5, "max_orders": 5}
+            return {"name": "GROWTH",  "risk_pct": 2.5, "max_orders": 10}
         elif balance < 2000:
-            return {"name": "PRO",     "risk_pct": 2.0, "max_orders": 5}
+            return {"name": "PRO",     "risk_pct": 2.0, "max_orders": 10}
         else:
-            return {"name": "ELITE",   "risk_pct": getattr(self.config, "risk_pct", 1.5), "max_orders": 5}
+            return {"name": "ELITE",   "risk_pct": getattr(self.config, "risk_pct", 1.5), "max_orders": 10}
 
     # ── Lot Size Calculator ────────────────────────────────────────────
 
@@ -218,15 +219,26 @@ class GoldRiskManager:
         tier       = self._get_tier(balance)
         max_orders = tier["max_orders"]
 
-        # Determine number of orders from signal strength
-        if signal_strength >= 0.95:
-            n_orders = min(5, max_orders)
-        elif signal_strength >= 0.85:
-            n_orders = min(3, max_orders)
-        elif signal_strength >= 0.75:
-            n_orders = min(2, max_orders)
+        # Determine number of orders based on balance overrides first
+        if balance >= 100:
+            n_orders = 10
+        elif balance >= 50:
+            n_orders = 7
         else:
-            n_orders = 1
+            # Fallback to signal strength logic for balances < $50
+            if signal_strength >= 0.95:
+                n_orders = min(5, max_orders)
+            elif signal_strength >= 0.85:
+                n_orders = min(3, max_orders)
+            elif signal_strength >= 0.75:
+                n_orders = min(2, max_orders)
+            else:
+                n_orders = 1
+
+        # --- Emergency Recovery Mode ($50 Protection) ---
+        if balance < 50:
+            logger.info(f"[GoldRisk] Emergency Recovery Active: Limiting to 1 order per signal.")
+            n_orders = min(n_orders, 1)
 
         # Clamp to remaining slot capacity
         remaining_slots = MAX_OPEN_GOLD_TRADES - open_gold_trades
@@ -237,13 +249,27 @@ class GoldRiskManager:
 
         base_lot = self.calculate_base_lot(balance, sl_points, atr_spike, session_mult)
         lots     = []
+        total_lot_sum = 0.0
         for i in range(n_orders):
             w   = PYRAMID_WEIGHTS[i]
             lot = round(max(MIN_LOT, base_lot * w), 2)
             lots.append(lot)
+            total_lot_sum += lot
+
+        # --- Stability Filter: Total Risk Cap (3%) ---
+        # Risk_USD = total_lots * 1000 * SL_points
+        # For Gold: 0.1 lot @ 1.0pts SL = $100 risk.
+        total_risk_usd = total_lot_sum * 1000 * sl_points
+        max_allowed_risk = balance * (MAX_TOTAL_PYRAMID_RISK_PCT / 100)
+
+        if total_risk_usd > max_allowed_risk:
+            # Scale down all lots proportionally to stay under the 3% cap
+            scale_factor = max_allowed_risk / total_risk_usd
+            logger.info(f"[GoldRisk] 🛡️ Risk Cap Triggered: ${total_risk_usd:.2f} > ${max_allowed_risk:.2f}. Scaling by {scale_factor:.2f}x")
+            lots = [round(max(MIN_LOT, l * scale_factor), 2) for l in lots]
 
         logger.info(
-            f"[GoldRisk] Pyramid plan: {n_orders} orders | strength={signal_strength:.0%} "
+            f"[GoldRisk] Pyramid plan: {len(lots)} orders | strength={signal_strength:.0%} "
             f"| lots={lots} | tier={tier['name']}"
         )
         return lots
@@ -279,10 +305,10 @@ class GoldRiskManager:
         if signal == "HOLD":
             return {"can_trade": False, "reason": "No signal", "lots": [], "volume": 0.0}
 
-        # 1. Daily loss limit
-        if _daily_loss_exceeded(balance):
-            return {"can_trade": False, "reason": f"Daily {DAILY_LOSS_LIMIT_PCT}% loss limit reached",
-                    "lots": [], "volume": 0.0}
+        # 1. Daily loss limit (REMOVED for continuous 24/5 scalping)
+        # if _daily_loss_exceeded(balance):
+        #     return {"can_trade": False, "reason": f"Daily {DAILY_LOSS_LIMIT_PCT}% loss limit reached",
+        #             "lots": [], "volume": 0.0}
 
         # 2. Max concurrent trades
         if open_gold_pos >= MAX_OPEN_GOLD_TRADES:
@@ -294,15 +320,15 @@ class GoldRiskManager:
             return {"can_trade": False, "reason": f"Spread {spread_points:.2f}pts too wide",
                     "lots": [], "volume": 0.0}
 
-        # 4. LBMA fix window
-        if strategy != "SCALP" and is_lbma_fix_time():
-            return {"can_trade": False, "reason": "LBMA gold fix window — paused",
-                    "lots": [], "volume": 0.0}
+        # 4. LBMA fix window (REMOVED for 24/5 trading)
+        # if strategy != "SCALP" and is_lbma_fix_time():
+        #     return {"can_trade": False, "reason": "LBMA gold fix window — paused",
+        #             "lots": [], "volume": 0.0}
 
-        # 5. News pause
-        if news_pause:
-            return {"can_trade": False, "reason": "High-impact news pause active",
-                    "lots": [], "volume": 0.0}
+        # 5. News pause (REMOVED for continuous 24/5 scalping)
+        # if news_pause:
+        #     return {"can_trade": False, "reason": "High-impact news pause active",
+        #             "lots": [], "volume": 0.0}
 
         # 6. ATR spike detection
         atr_spike = (atr > 0 and avg_atr > 0 and atr > avg_atr * ATR_SPIKE_MULTIPLIER)

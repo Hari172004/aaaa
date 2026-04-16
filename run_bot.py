@@ -21,25 +21,28 @@ if __name__ == "__main__":
     # ── File logging (5MB x 3 rotating) ─────────────────────────────────
     setup_file_logging(log_file="agniv_bot.log", max_bytes=5*1024*1024, backup_count=3)
 
-    # ── Strategy Selection ───────────────────────────────────────────
+    # ── Strategy Selection (INTERACTIVE) ──────────────────────────────
     console = Console()
-    console.print(Panel.fit(
-        "[bold gold1]Select Trading Strategy[/]\n"
-        "1. [bold cyan]SCALP[/] (High frequency, shorter timeframes)\n"
-        "2. [bold magenta]HOLD[/]  (Swing trading, longer timeframes)",
-        border_style="blue"
-    ))
+    env_strategy = os.getenv("BOT_STRATEGY", "PROMPT").upper()
     
-    choice = Prompt.ask("Choose mode", choices=["1", "2"], default="1")
-    
-    if choice == "1":
-        selected_strategy = "SCALP"
+    if env_strategy == "PROMPT":
+        console.print(Panel("[bold cyan]AGNI-V GOLD BOT[/]\n[white]Select your trading strategy for this session:[/]", expand=False))
+        console.print("  [bold yellow]1.[/] SCALP")
+        console.print("  [bold yellow]2.[/] SWING")
+        console.print("  [bold yellow]3.[/] AUTO")
+        
+        choice = Prompt.ask(
+            "\n[bold white]Enter choice[/]",
+            choices=["1", "2", "3"],
+            default="1"
+        )
+        selected_strategy = {"1": "SCALP", "2": "SWING", "3": "AUTO"}[choice]
     else:
-        selected_strategy = "SWING"
+        selected_strategy = env_strategy if env_strategy in ["SCALP", "SWING", "AUTO"] else "SCALP"
 
     leverage = int(os.getenv("BOT_LEVERAGE", "1000"))
 
-    console.print(f"\n[bold green]✅ Strategy Active:[/] [bold white]{selected_strategy}[/]\n")
+    console.print(f"\n[bold green]🚀 Launching with Strategy:[/] [bold white]{selected_strategy}[/]\n")
 
     config = BotConfig(
         mode              = os.getenv("BOT_MODE", "REAL"),
@@ -47,7 +50,7 @@ if __name__ == "__main__":
         strategy          = selected_strategy,
         risk_pct          = float(os.getenv("BOT_RISK_PCT", "2.0")),
         leverage          = leverage,
-        mt5_account       = int(os.getenv("MT5_ACCOUNT", "0")),
+        mt5_account       = int(os.getenv("MT5_ACCOUNT", "0") or "0"),
         mt5_password      = os.getenv("MT5_PASSWORD", ""),
         mt5_server        = os.getenv("MT5_SERVER", ""),
         firm              = os.getenv("FUNDED_FIRM", "FTMO"),

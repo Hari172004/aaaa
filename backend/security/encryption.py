@@ -7,7 +7,8 @@ import hmac
 import hashlib
 import json
 import base64
-from typing import Dict, Any, Union
+import time
+from typing import Dict, Any, Union, Optional, Tuple
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -78,28 +79,45 @@ class AgniVEncryption:
         decrypted_str = self.decrypt_string(ciphertext)
         return json.loads(decrypted_str)
 
-    def sign_request(self, payload: Union[str, Dict], secret: str) -> str:
+    def sign_request(self, payload: Union[str, Dict], secret: str, timestamp: Optional[float] = None) -> Tuple[str, float]:
         """
         Generate HMAC SHA-256 signature for bot-to-backend communication.
-        Provides protection against tampering and replay attacks.
+        Includes a timestamp to prevent replay attacks.
+        Returns (signature, timestamp).
         """
+        ts = timestamp or time.time()
+        
         if isinstance(payload, dict):
             # Sort keys to ensure deterministic ordering of JSON strings
             payload_str = json.dumps(payload, separators=(',', ':'), sort_keys=True)
         else:
-            payload_str = payload
+            payload_str = str(payload)
+
+        # Mix timestamp into the message
+        msg = f"{ts}|{payload_str}"
 
         signature = hmac.new(
             key=secret.encode('utf-8'),
-            msg=payload_str.encode('utf-8'),
+            msg=msg.encode('utf-8'),
             digestmod=hashlib.sha256
         ).hexdigest()
         
-        return signature
+        return signature, ts
 
-    def verify_request_signature(self, payload: Union[str, Dict], secret: str, provided_signature: str) -> bool:
-        """Verify an HMAC SHA-256 signature."""
-        expected_signature = self.sign_request(payload, secret)
+    def verify_request_signature(self, payload: Union[str, Dict], secret: str, 
+                                 provided_signature: str, provided_ts: float, 
+                                 max_age_sec: int = 60) -> bool:
+        """
+        Verify an HMAC SHA-256 signature and check for potential replay attacks (expiry).
+        """
+        # 1. Check message age
+        age = time.time() - provided_ts
+        if age < -5 or age > max_age_sec:
+            # Allow for 5 sec clock skew
+            return False
+
+        # 2. Recompute and compare
+        expected_signature, _ = self.sign_request(payload, secret, timestamp=provided_ts)
         return hmac.compare_digest(expected_signature, provided_signature)
 
 # Global singleton for backend usage

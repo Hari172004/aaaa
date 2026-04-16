@@ -26,7 +26,7 @@ import logging
 import os
 from typing import Optional
 
-import numpy as np
+import numpy as np # type: ignore
 import pandas as pd
 
 logger = logging.getLogger("agniv.strategies.diy_custom_builder")
@@ -255,6 +255,68 @@ class _RSILeading:
         return {"long": val > self.midline, "short": val < self.midline}
 
 
+class _SidewaysLeading:
+    """Mean Reversion (Sideways) leading indicator using Peak & Bottom logic from Pine Script."""
+
+    def __init__(self, rsi_length: int = 14, lookback_period: int = 14,
+                 volume_threshold: float = 2.0, divergence_threshold: float = 0.05,
+                 overbought: int = 70, oversold: int = 30):
+        self.rsi_length  = rsi_length
+        self.lookback    = lookback_period
+        self.vol_mult    = volume_threshold
+        self.div_thresh  = divergence_threshold
+        self.ob = overbought
+        self.os = oversold
+
+    def evaluate(self, df: pd.DataFrame) -> dict:
+        min_bars = max(self.rsi_length, self.lookback) + 10
+        if len(df) < min_bars:
+            return {"long": False, "short": False}
+        
+        close  = df["close"]
+        vol    = df["volume"]
+        
+        # 1. RSI calculation
+        delta = close.diff()
+        gain  = delta.clip(lower=0).ewm(alpha=1/self.rsi_length, adjust=False).mean()
+        loss  = (-delta.clip(upper=0)).ewm(alpha=1/self.rsi_length, adjust=False).mean()
+        rsi   = 100 - (100 / (1 + gain / loss.replace(0, float("nan"))))
+        
+        cur_rsi  = float(rsi.iloc[-1])
+        past_rsi = float(rsi.iloc[-self.lookback])
+        
+        # 2. Moving Averages
+        fast_ma = close.rolling(int(self.lookback / 2)).mean().iloc[-1]
+        slow_ma = close.rolling(self.lookback).mean().iloc[-1]
+        
+        # 3. Volume Analysis
+        avg_vol = vol.rolling(self.lookback).mean().iloc[-1]
+        is_vol_spike = float(vol.iloc[-1]) > (avg_vol * self.vol_mult)
+        
+        # 4. RSI Divergence
+        # Formula: (rsi[lookback] - rsi) / rsi[lookback]
+        div_val = (past_rsi - cur_rsi) / past_rsi if past_rsi != 0 else 0
+        has_divergence = abs(div_val) > self.div_thresh
+        
+        cur_price = float(close.iloc[-1])
+        
+        # 5. Peak & Bottom Conditions (from Pine Script)
+        # Sell Signal: RSI > 70 + Divergence + Volume Spike + Price > MAs
+        is_peak = (cur_rsi > self.ob and has_divergence and 
+                   is_vol_spike and cur_price > fast_ma and cur_price > slow_ma)
+        
+        # Buy Signal: RSI < 30 + Divergence + Volume Spike + Price < MAs
+        is_bottom = (cur_rsi < self.os and has_divergence and 
+                     is_vol_spike and cur_price < fast_ma and cur_price < slow_ma)
+        
+        if is_peak:
+            logger.info(f"🔴 [Sideways] PEAK Detected! RSI={cur_rsi:.1f} Div={div_val:.1%} VolSpike=YES")
+        if is_bottom:
+            logger.info(f"🟢 [Sideways] BOTTOM Detected! RSI={cur_rsi:.1f} Div={div_val:.1%} VolSpike=YES")
+            
+        return {"long": is_bottom, "short": is_peak}
+
+
 # ===========================================================================
 #  CONFIRMATION FILTER ENGINES  (light wrappers around our filter modules)
 # ===========================================================================
@@ -390,6 +452,7 @@ class DIYCustomStrategy:
         "2 EMA Cross":        _EMALeading,
         "MACD":               _MACDLeading,
         "RSI":                _RSILeading,
+        "Sideways":           _SidewaysLeading,
     }
 
     def __init__(self, config_path: str = "diy_scalp_config.json"):
@@ -412,6 +475,7 @@ class DIYCustomStrategy:
             "adx": 20.0,
             "vwap": 0.0,
             "regime": "Low Volatility",
+            "active_mode": "Trending",
         }
 
         # Build leading indicator
@@ -433,10 +497,12 @@ class DIYCustomStrategy:
             if f_obj is not None:
                 self._filters.append((f_cfg["name"], f_obj))
 
+        self.strict_htf_trend = self.config.get("strict_htf_trend", True)
+
         logger.info(
             f"[DIY] Loaded: leading='{li_name}' | "
             f"filters={[n for n, _ in self._filters]} | "
-            f"expiry={self.signal_expiry} | mode={'SCALP' if 'scalp' in config_path else 'SWING'}"
+            f"expiry={self.signal_expiry} | strict_htf={self.strict_htf_trend}"
         )
 
     # ------------------------------------------------------------------
@@ -476,13 +542,13 @@ class DIYCustomStrategy:
 
     # ------------------------------------------------------------------
 
-    def generate_signal(self, df: pd.DataFrame) -> str:
+    def generate_signal(self, df: pd.DataFrame, df_h1: pd.DataFrame = None) -> str:
         """
         Evaluate the leading indicator and all confirmation filters.
 
         Args:
-            df: OHLCV DataFrame with columns [open, high, low, close, volume].
-                Must have at least 200 rows for reliable signals.
+            df: OHLCV DataFrame (M1/M5)
+            df_h1: Optional High-Timeframe DataFrame (H1) for trend confluence.
 
         Returns:
             "BUY" | "SELL" | "HOLD"
@@ -491,22 +557,77 @@ class DIYCustomStrategy:
             return "HOLD"
 
         try:
-            return self._evaluate(df)
+            return self._evaluate(df, df_h1)
         except Exception as e:
             logger.exception(f"[DIY] generate_signal error: {e}")
             return "HOLD"
 
-    def _evaluate(self, df: pd.DataFrame) -> str:
-        # --- Step 1: Run the leading indicator ---
-        li_result = self._leading.evaluate(df)
+    def _evaluate(self, df: pd.DataFrame, df_h1: pd.DataFrame = None) -> str:
+        # --- Step 0: Regime Detection (ADX) ---
+        adx_threshold = self.config.get("regime_adx_threshold", 20.0)
+        adx_val = self._last_metrics.get("adx", adx_threshold)
+        is_sideways = adx_val < adx_threshold
+        enable_sideways = self.config.get("enable_sideways_mode", True)
+        
+        active_engine = self._leading
+        if is_sideways and enable_sideways:
+            # Overwrite active engine with Sideways logic
+            sideways_cfg = self.config.get("sideways_settings", {})
+            active_engine = _SidewaysLeading(
+                rsi_length=sideways_cfg.get("rsi_length", 14),
+                lookback_period=sideways_cfg.get("lookback_period", 14),
+                volume_threshold=sideways_cfg.get("volume_threshold", 2.0),
+                divergence_threshold=sideways_cfg.get("divergence_threshold", 0.05),
+                overbought=sideways_cfg.get("overbought", 70),
+                oversold=sideways_cfg.get("oversold", 30)
+            )
+            self._last_metrics["active_mode"] = "Sideways (Peak/Bottom)"
+            if self._pending_direction is None:
+                logger.info(f"[DIY] Strategy Switch: ↔️ SIDEWAYS MODE (ADX={adx_val:.1f})")
+        else:
+            self._last_metrics["active_mode"] = "Trending (Peak Mode)"
+            if self._pending_direction is None:
+                logger.debug(f"[DIY] Strategy Switch: 🚀 TREND MODE (ADX={adx_val:.1f})")
+        
+        # --- Step 1: Run the active leading indicator ---
+        li_result = active_engine.evaluate(df)
         li_long   = li_result.get("long", False)
         li_short  = li_result.get("short", False)
 
+        # --- Step 1.5: HTF Trend Filter (Hard Gate) ---
+        h1_bullish, h1_bearish = True, True  # Default if no H1 data
+        if df_h1 is not None and not df_h1.empty:
+            # Simple EMA 100 on H1 for trend direction
+            h1_close = df_h1["close"]
+            h1_ema   = _ema(h1_close, 100)
+            h1_bullish = float(h1_close.iloc[-1]) > float(h1_ema.iloc[-1])
+            h1_bearish = float(h1_close.iloc[-1]) < float(h1_ema.iloc[-1])
+
         new_direction: Optional[str] = None
         if li_long:
-            new_direction = "BUY"
+            if not self.strict_htf_trend or h1_bullish:
+                new_direction = "BUY"
+            else:
+                logger.debug("[DIY] Signal blocked: Leading=BUY but H1 Trend=BEARISH (Strict Mode ON)")
         elif li_short:
-            new_direction = "SELL"
+            if not self.strict_htf_trend or h1_bearish:
+                new_direction = "SELL"
+            else:
+                logger.debug("[DIY] Signal blocked: Leading=SELL but H1 Trend=BULLISH (Strict Mode ON)")
+
+        # --- Step 3: Compute Dashboard metrics ---
+        try:
+            self._update_dashboard_metrics(df)
+        except Exception as e:
+            logger.debug(f"[DIY] update metrics error: {e}")
+
+        # --- Step 1.6: Immediate Sideways Entry (Bypass Pending/Confirm) ---
+        if is_sideways and new_direction is not None:
+             logger.info(f"[DIY] ↔️ Sideways Peak/Bottom Trigger: {new_direction} (Immediate Execute)")
+             # Reset any pending state to avoid double-firing next candle
+             self._pending_direction = None
+             self._pending_bars      = 0
+             return new_direction
 
         # --- Step 2: Manage pending state ---
         if new_direction is not None:
@@ -533,12 +654,6 @@ class DIYCustomStrategy:
             self._pending_direction = None
             self._pending_bars      = 0
             return "HOLD"
-
-        # --- Step 3: Compute Dashboard metrics ---
-        try:
-            self._update_dashboard_metrics(df)
-        except Exception as e:
-            logger.debug(f"[DIY] update metrics error: {e}")
 
         if self._pending_direction is None:
             return "HOLD"

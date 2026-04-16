@@ -65,12 +65,12 @@ class GoldScalpStrategy:
         prev  = df.iloc[-2]
         live_close_val = float(last["close"])
 
-        # 1. Kill Zone gating
-        if not is_gold_scalp_time(ignore_lbma=ignore_sessions, ignore_asian=ignore_sessions):
-            if not ignore_sessions:
-                sess = get_current_gold_session()
-                reason = "LBMA fix window" if sess["is_lbma_fix"] else "Outside Kill Zone"
-                return {**empty, "reason": reason}
+        # 1. Kill Zone gating (REMOVED for 24/5 trading)
+        # if not is_gold_scalp_time(ignore_lbma=ignore_sessions, ignore_asian=ignore_sessions):
+        #     if not ignore_sessions:
+        #         sess = get_current_gold_session()
+        #         reason = "LBMA fix window" if sess["is_lbma_fix"] else "Outside Kill Zone"
+        #         return {**empty, "reason": reason}
 
         # 2. HTF Trend Alignment (H1 EMA 100)
         h1_bullish, h1_bearish = True, True # default if no H1
@@ -106,8 +106,9 @@ class GoldScalpStrategy:
         is_london = 7 <= now_hour <= 10
         is_ny     = 13 <= now_hour <= 17
         
-        if is_sniper and not (is_london or is_ny):
-             return {**empty, "reason": "Sniper: Outside High-Liquidity Windows (London/NY)"}
+        # REMOVED for 24/5 trading
+        # if is_sniper and not (is_london or is_ny):
+        #      return {**empty, "reason": "Sniper: Outside High-Liquidity Windows (London/NY)"}
 
         # 5. Momentum: 50 EMA + RSI (M1/M5)
         ema50 = float(last.get("ema_50", 0))
