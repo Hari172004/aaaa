@@ -57,6 +57,7 @@ from filters.world_monitor         import WorldMonitorAPI    # type: ignore
 from analysis.macro_monitor        import MacroMonitor       # type: ignore
 from backend.security.integrity  import checker as integrity_checker # type: ignore
 from strategies.mtf_smc_scalp    import MTFSMCScalpStrategy  # type: ignore
+from filters.auto_sniper         import AutoSniperDetector    # type: ignore
 
 load_dotenv(override=True)
 
@@ -188,6 +189,16 @@ class AgniVBot:
         if config.use_mtf_smc:
             logger.info("[Core] ⚡ MTF SMC 3-Gate Engine ACTIVE (15m/5m/1m + BvS Fight)")
 
+        # ── Auto-Sniper Detector ────────────────────────────────────────────
+        self.auto_sniper = AutoSniperDetector(
+            volume_spike_mult = 2.5,
+            body_ratio_min    = 0.65,
+            sweep_lookback    = 20,
+            min_signals       = 2,
+        )
+        logger.info("[Core] 🎯 Auto-Sniper Detector ACTIVE (Vol+Impulse+Sweep detection)")
+
+
         self.history      = HistoryStore()
         self._correlation = CorrelationEngine(self.history)
         self._smc         = SMCEngine()
@@ -234,6 +245,7 @@ class AgniVBot:
 
         # Open positions tracking
         self._real_positions: dict = {}   # ticket → {sl, tp, entry, direction, journal_id}
+        self._auto_sniper_active: bool = False  # tracks current sniper state for dashboard
 
         logger.info(
             f"[Core] Agni-V Gold Bot initialised | Mode={config.mode} "
@@ -451,6 +463,7 @@ class AgniVBot:
         current_bal = self.dashboard_state.get("balance", 0.0)
         is_ghost = self.diy_scalp.config.get("ghost_mode", False) if self.diy_scalp else False
         is_recovery = (current_bal < 100)  # Recovery range: any balance below $100
+        sniper_active = getattr(self, "_auto_sniper_active", False)
         
         conn_status = "[bold green]CONNECTED[/]" if self.mt5.connected else "[bold red]OFFLINE[/]"
         if is_ghost:
@@ -462,8 +475,10 @@ class AgniVBot:
         else:
             mode_name  = self.config.mode
             mode_color = "green" if self.config.mode == MODE_REAL else "cyan"
+
+        sniper_tag = "  [bold white on dark_orange]🎯 SNIPER[/]" if sniper_active else ""
         
-        header_text = f"[bold white on blue] AGNI-V GOLD BOT [/]  MODE: [{mode_color}] {mode_name} [/]  MT5: {conn_status}  BAL: [bold green]${current_bal:.2f}[/]"
+        header_text = f"[bold white on blue] AGNI-V GOLD BOT [/]  MODE: [{mode_color}] {mode_name} [/]{sniper_tag}  MT5: {conn_status}  BAL: [bold green]${current_bal:.2f}[/]"
         layout["header"].update(Panel(Text.from_markup(header_text), style="blue", box=box.ROUNDED))
 
         # Main Table (Ultimate Scalping Tool)
@@ -699,6 +714,30 @@ class AgniVBot:
             self.dashboard_state["metrics"]["signal"] = signal
             self.dashboard_state["metrics"]["strength"] = strength
 
+        # ── 6.6 Auto-Sniper Scan (runs every tick on 1m data) ────────────────
+        # Only scan when we have a non-HOLD signal to avoid useless work
+        sniper_result = {"is_sniper_entry": False}
+        if final_signal in ("BUY", "SELL") and self.mt5.connected:
+            df_1m_snap = self.mt5.get_ohlcv(symbol, "M1", 50)
+            df_5m_snap = self.mt5.get_ohlcv(symbol, "M5", 30)
+            if not df_1m_snap.empty:
+                sniper_result = self.auto_sniper.scan(df_1m_snap, df_5m_snap)
+                if sniper_result["is_sniper_entry"]:
+                    sniper_dir = sniper_result["direction"]
+                    if sniper_dir == final_signal:  # only activate if direction agrees
+                        # Boost strength above AI threshold to guarantee entry
+                        strength = max(strength + sniper_result["strength_boost"], 0.95)
+                        # Store multipliers for use in SL/TP below
+                        signal_data["_sniper_sl_mult"] = sniper_result["sl_multiplier"]
+                        signal_data["_sniper_tp_mult"] = sniper_result["tp_multiplier"]
+                        signal_data["_sniper_reason"]  = sniper_result["reason"]
+                        self._auto_sniper_active = True
+                        logger.info(f"[Core] {sniper_result['reason']}")
+                    else:
+                        self._auto_sniper_active = False
+                else:
+                    self._auto_sniper_active = False
+
         # ── 6.5 Dynamic Momentum Exit (Opposite Signal Close) ──
         if final_signal in ("BUY", "SELL"):
             for pos in self._get_open_positions():
@@ -815,8 +854,18 @@ class AgniVBot:
         sl_val    = risk_res["sl_value"]
 
         # Recompute SL/TP with gold risk manager's SL
-        sl = entry - sl_val if final_signal == "BUY" else entry + sl_val
-        tp = entry + (sl_val * 2.5) if final_signal == "BUY" else entry - (sl_val * 2.5)
+        # If Auto-Sniper is active, override multipliers for tighter SL / wider TP
+        sniper_sl_mult = signal_data.get("_sniper_sl_mult", 1.0)
+        sniper_tp_mult = signal_data.get("_sniper_tp_mult", 2.5)
+        if signal_data.get("_sniper_reason"):
+            sl_val_adj = sl_val * sniper_sl_mult
+            tp_ratio   = sniper_tp_mult
+            logger.info(f"[Core] 🎯 Sniper SL={sl_val_adj:.2f} TP={tp_ratio:.1f}R")
+        else:
+            sl_val_adj = sl_val
+            tp_ratio   = 2.5
+        sl = entry - sl_val_adj if final_signal == "BUY" else entry + sl_val_adj
+        tp = entry + (sl_val_adj * tp_ratio) if final_signal == "BUY" else entry - (sl_val_adj * tp_ratio)
 
         # 12. Signal alert (broadcast to Telegram/email)
         is_recovery = (current_bal < 50)
