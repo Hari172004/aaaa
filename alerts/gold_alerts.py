@@ -37,14 +37,17 @@ class GoldAlerts:
     # ── 1. Trade Signal ───────────────────────────────────────────────────
 
     def signal_alert(self, symbol: str, signal: str, strategy: str, reason: str,
-                     entry: float = 0.0, sl: float = 0.0, tp: float = 0.0):
+                     entry: float = 0.0, sl: float = 0.0, tp: float = 0.0, is_recovery: bool = False):
         """Fire on every Gold BUY/SELL signal."""
         direction_emoji = EMOJI["buy"] if signal == "BUY" else EMOJI["sell"]
+        mode_label = "🛡️ <b>Mode: RECOVERY</b> (High Sensitivity)" if is_recovery else "⚙️ <b>Mode: Standard</b>"
+        
         action_line     = f"{direction_emoji} <b>{symbol} {strategy} — {signal}</b>"
         msg = (
             f"🥇 <b>Agni-V Gold Signal</b>\n"
             f"{'─' * 30}\n"
-            f"{action_line}\n\n"
+            f"{action_line}\n"
+            f"{mode_label}\n\n"
             f"📝 <i>{reason}</i>\n"
         )
         if entry > 0:

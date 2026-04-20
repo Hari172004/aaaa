@@ -36,7 +36,7 @@ DAILY_LOSS_LIMIT_PCT  = 5.0     # stop trading after 5% daily drawdown
 MAX_SPREAD_POINTS     = 3.0     # 30 pips = 3.0 XAU points — pause if wider
 MAX_TOTAL_PYRAMID_RISK_PCT = 3.5  # Restored Safety Cap for $100 account
 ATR_SPIKE_MULTIPLIER  = 3.5     # reduce size 70% if ATR > 3.5x rolling avg
-MIN_SL_POINTS         = 1.0     # minimum SL distance (10 pips)
+MIN_SL_POINTS         = 3.5     # minimum SL distance (35 pips) — increased for breathing room
 
 # News blackout window around high-impact events
 NEWS_BLACKOUT_MINS = 30
@@ -139,13 +139,13 @@ class GoldRiskManager:
             return {"name": "FUNDED", "risk_pct": 1.0, "max_orders": 2}
 
         if balance < 20:
-            return {"name": "NANO",    "risk_pct": 3.0, "max_orders": 5}
+            return {"name": "NANO",    "risk_pct": 3.0, "max_orders": 2}
         elif balance < 50:
-            return {"name": "MICRO",   "risk_pct": 4.0, "max_orders": 5}
+            return {"name": "MICRO",   "risk_pct": 4.0, "max_orders": 2}
         elif balance < 100:
-            return {"name": "STARTER", "risk_pct": 3.5, "max_orders": 7}
+            return {"name": "STARTER", "risk_pct": 3.5, "max_orders": 4}
         elif balance < 500:
-            return {"name": "GROWTH",  "risk_pct": 2.5, "max_orders": 10}
+            return {"name": "GROWTH",  "risk_pct": 2.5, "max_orders": 7}
         elif balance < 2000:
             return {"name": "PRO",     "risk_pct": 2.0, "max_orders": 10}
         else:
@@ -159,6 +159,7 @@ class GoldRiskManager:
         sl_points:    float,
         atr_spike:    bool = False,
         session_mult: float = 1.0,
+        strategy:     str   = "SCALP",
     ) -> float:
         """
         Calculate the base anchor lot size for one trade.
@@ -190,8 +191,20 @@ class GoldRiskManager:
             max_funded = balance * 0.005 / (sl_pts * 100)
             raw_lot = min(raw_lot, max_funded)
 
+        # Recovery Mode: Hard lock to 0.01 lots for balances under $50
+        if balance < 50:
+            lot = MIN_LOT
+            logger.info(f"[GoldRisk] 🛡️ SUPER SENSITIVE RECOVERY: Lot size locked to {lot} (balance < $50)")
+            return lot
+
+        # Ghost Mode Cap: Hard limit to 0.01 lot for aggressive pulse entries
+        if strategy == "GHOST SCALP":
+            lot = MIN_LOT
+            logger.info(f"[GoldRisk] 👻 GHOST MODE LOCK: Lot size locked to {lot} to strictly limit high-frequency risk.")
+            return lot
+
         lot = round(max(MIN_LOT, min(raw_lot, MAX_LOT)), 2)
-        logger.debug(f"[GoldRisk] base_lot={lot} | risk_usd=${risk_usd:.2f} | sl={sl_pts:.2f}pts")
+        logger.debug(f"[GoldRisk] base_lot={lot} | risk_usd=${risk_usd:.2f} | sl={sl_pts:.2f}pts | strategy={strategy}")
         return lot
 
     # ── Pyramid Order Calculator ───────────────────────────────────────
@@ -204,6 +217,7 @@ class GoldRiskManager:
         atr_spike:        bool  = False,
         session_mult:     float = 1.0,
         open_gold_trades: int   = 0,
+        strategy:         str   = "SCALP",
     ) -> List[float]:
         """
         Return a list of lot sizes for pyramid orders.
@@ -219,26 +233,23 @@ class GoldRiskManager:
         tier       = self._get_tier(balance)
         max_orders = tier["max_orders"]
 
-        # Determine number of orders based on balance overrides first
-        if balance >= 100:
-            n_orders = 10
-        elif balance >= 50:
+        # Determine number of orders based on balance overrides
+        if balance < 50:
+            # Super Sensitive Recovery: 1 order ONLY — prevents all pyramid orders
+            # hitting the same SL simultaneously (which wiped $10+ per burst event)
+            n_orders = 1
+            logger.info(f"[GoldRisk] 🔥 SUPER SENSITIVE ($<$50): 1-order-only mode (no pyramid bursts)")
+        elif balance < 100:
+            # Normal Recovery Mode: 4-order limit for $50–$100
+            n_orders = 4
+            logger.info(f"[GoldRisk] 🛡️ RECOVERY ($50-$100): 4-order limit active")
+        elif balance >= 500:
             n_orders = 7
         else:
-            # Fallback to signal strength logic for balances < $50
-            if signal_strength >= 0.95:
-                n_orders = min(5, max_orders)
-            elif signal_strength >= 0.85:
-                n_orders = min(3, max_orders)
-            elif signal_strength >= 0.75:
-                n_orders = min(2, max_orders)
-            else:
-                n_orders = 1
+            n_orders = 4
 
-        # --- Emergency Recovery Mode ($50 Protection) ---
-        if balance < 50:
-            logger.info(f"[GoldRisk] Emergency Recovery Active: Limiting to 1 order per signal.")
-            n_orders = min(n_orders, 1)
+        # Final check against tier Max Orders
+        n_orders = min(n_orders, max_orders)
 
         # Clamp to remaining slot capacity
         remaining_slots = MAX_OPEN_GOLD_TRADES - open_gold_trades
@@ -247,7 +258,7 @@ class GoldRiskManager:
         if n_orders == 0:
             return []
 
-        base_lot = self.calculate_base_lot(balance, sl_points, atr_spike, session_mult)
+        base_lot = self.calculate_base_lot(balance, sl_points, atr_spike, session_mult, strategy)
         lots     = []
         total_lot_sum = 0.0
         for i in range(n_orders):
@@ -305,10 +316,13 @@ class GoldRiskManager:
         if signal == "HOLD":
             return {"can_trade": False, "reason": "No signal", "lots": [], "volume": 0.0}
 
-        # 1. Daily loss limit (REMOVED for continuous 24/5 scalping)
-        # if _daily_loss_exceeded(balance):
-        #     return {"can_trade": False, "reason": f"Daily {DAILY_LOSS_LIMIT_PCT}% loss limit reached",
-        #             "lots": [], "volume": 0.0}
+        # 1. Recovery Mode: Circuit Breaker (15% Daily Loss — only for sub-$50)
+        daily_stats = self.stats()
+        daily_loss  = daily_stats.get("daily_loss", 0.0)
+        # Only apply circuit breaker in Super Sensitive mode (balance < $50)
+        if balance < 50 and daily_loss >= (balance * 0.15):
+             logger.warning(f"[GoldRisk] 🛡️ CIRCUIT BREAKER ACTIVE: Daily loss ${daily_loss:.2f} >= 15%. Pausing for 4h.")
+             return {"can_trade": False, "reason": "Circuit Breaker: 15% Day Loss Reached", "lots": [], "volume": 0.0}
 
         # 2. Max concurrent trades
         if open_gold_pos >= MAX_OPEN_GOLD_TRADES:
@@ -345,7 +359,7 @@ class GoldRiskManager:
             logger.info(f"[GoldRisk] London/NY Overlap: risk +25%")
 
         # 8. Calculate SL
-        sl_val = max(float(atr) * 1.2, MIN_SL_POINTS)
+        sl_val = max(float(atr) * 2.0, MIN_SL_POINTS)
 
         # 9. Calculate pyramid lot plan
         lots = self.calculate_pyramid_lots(
@@ -355,6 +369,7 @@ class GoldRiskManager:
             atr_spike        = atr_spike,
             session_mult     = session_mult,
             open_gold_trades = open_gold_pos,
+            strategy         = strategy,
         )
 
         if not lots:

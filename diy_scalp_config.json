@@ -3,23 +3,31 @@
   "symbol": "GOLD",
   "timeframe": "M1",
   "alternate_signal": false,
-  "strict_htf_trend": false,
+  "signal_expiry": 3,
+  "strict_htf_trend": true,
   "enable_sideways_mode": true,
-  "regime_adx_threshold": 10.0,
+  "regime_adx_threshold": 12.0,
+  "rsi_overbought_block": 65,
+  "rsi_oversold_block": 35,
+  "ghost_mode": true,
+  "ghost_tp_points": 1.0,
+  "ghost_sl_points": 1.5,
+  "ghost_rsi_ob": 80,
+  "ghost_rsi_os": 20,
   "sideways_settings": {
     "lookback_period": 14,
     "rsi_length": 14,
     "volume_threshold": 2.0,
     "divergence_threshold": 0.05,
-    "overbought": 65,
-    "oversold": 35
+    "overbought": 58,
+    "oversold": 42
   },
 
   "leading_indicator": {
     "name": "2 EMA Cross",
     "params": {
-      "fast": 9,
-      "slow": 21
+      "fast": 20,
+      "slow": 50
     }
   },
 
@@ -36,9 +44,9 @@
     },
     {
       "name": "wae",
-      "enabled": false,
+      "enabled": true,
       "params": {
-        "sensitivity": 150,
+        "sensitivity": 120,
         "fast_ema": 20,
         "slow_ema": 40,
         "bb_length": 20,
@@ -49,12 +57,12 @@
     },
     {
       "name": "adx",
-      "enabled": false,
+      "enabled": true,
       "params": {
-        "di_length": 10,
-        "adx_length": 5,
-        "key_level": 15,
-        "mode": "adx_di"
+        "di_length": 14,
+        "adx_length": 14,
+        "key_level": 22,
+        "mode": "adx_only"
       }
     },
     {
@@ -104,7 +112,7 @@
     },
     {
       "name": "ema_filter",
-      "enabled": false,
+      "enabled": true,
       "params": {
         "period": 200
       }

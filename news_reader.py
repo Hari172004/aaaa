@@ -117,7 +117,49 @@ class NewsReader:
         text_l = text.lower()
         return any(kw in text_l for kw in MACRO_KEYWORDS)
 
+    def get_blackout_status(self, window_before_mins: int = 15, window_after_mins: int = 15) -> dict:
+        """
+        Check if current time is within a blackout window for a HIGH impact event.
+        Returns:
+            {
+                'active': bool,
+                'event': str | None,
+                'starts_in': int (seconds) | None,
+                'ends_in': int (seconds) | None
+            }
+        """
+        with self._lock:
+            events = list(self._events)
+
+        now = datetime.now(timezone.utc)
+        high_events = [e for e in events if e.get("impact") == "HIGH"]
+
+        for e in high_events:
+            event_time = e["time"]
+            diff_sec   = (event_time - now).total_seconds()
+
+            # Window Check: -15min to +15min
+            if -window_after_mins * 60 <= diff_sec <= window_before_mins * 60:
+                return {
+                    "active":    True,
+                    "event":     e["event"],
+                    "starts_in": max(0, int(diff_sec)),
+                    "ends_in":   int(diff_sec + window_after_mins * 60)
+                }
+        
+        # Find next upcoming event for dashboard
+        upcoming = sorted([e for e in high_events if e["time"] > now], key=lambda x: x["time"])
+        next_event = upcoming[0] if upcoming else None
+        
+        return {
+            "active":    False,
+            "event":     next_event["event"] if next_event else None,
+            "time":      next_event["time"] if next_event else None,
+            "starts_in": int((next_event["time"] - now).total_seconds()) if next_event else None
+        }
+
     def get_sentiment(self, symbol: str = "XAUUSD") -> dict:
+
         """
         Aggregate sentiment for XAUUSD from recent articles.
         Returns:
@@ -166,7 +208,7 @@ class NewsReader:
             "articles_used":        used,
             "high_impact_events":   upcoming_high,
         }
-        logger.info(f"[News] Sentiment={label} ({avg_score:+.3f}) | HighImpact={len(upcoming_high)}")
+        # logger.info(f"[News] Sentiment={label} ({avg_score:+.3f}) | HighImpact={len(upcoming_high)}")
         return result
 
     def needs_refresh(self) -> bool:

@@ -30,6 +30,8 @@ class RiskState:
     pause_reason: str         = ""
     cooldown_until: float     = 0.0  # ← Unix timestamp; 0 = no cooldown
     anti_martingale_mult: float = 1.0  # ← Current lot-size multiplier (0.5 – 1.5)
+    last_loss_direction: str  = ""    # ← "BUY" or "SELL"
+    lockout_until: float      = 0.0   # ← Unix timestamp
 
 
 class RiskManager:
@@ -56,13 +58,15 @@ class RiskManager:
     def set_dynamic_safety(self, balance: float):
         """Adjust risk parameters based on account size."""
         if balance < 50:
-            self.breakeven_at_r = 0.3  # Nano-Safety: Protect $10 accounts
-            self.max_daily_loss_pct = 100.0 # Unlimited
-            logger.info(f"[RiskMgr] NANO balance ({balance}) detected. Breakeven=0.3R, MaxLoss=20%.")
-        elif balance < 500:
-            self.breakeven_at_r = 0.7 
-            self.max_daily_loss_pct = 100.0 # Unlimited
-            logger.info(f"[RiskMgr] Low balance ({balance}) detected. Breakeven=0.7R, MaxLoss=10%.")
+            # Micro-account: tighter breakeven but still uses full confirmation
+            self.breakeven_at_r = 0.5
+            self.max_daily_loss_pct = 100.0  # Unlimited
+            logger.info(f"[RiskMgr] Micro-Account (${balance:.2f}): Breakeven=0.5R")
+        elif balance < 100:
+            # Recovery Mode: $50–$100
+            self.breakeven_at_r = 0.7
+            self.max_daily_loss_pct = 100.0  # Unlimited
+            logger.info(f"[RiskMgr] Recovery Mode (Normal): balance=${balance:.2f} | Breakeven=0.7R")
         else:
             self.breakeven_at_r = 1.0
 
@@ -179,7 +183,7 @@ class RiskManager:
 
     # ── Consecutive Loss / Daily Loss Guards ───────────────────
 
-    def check_can_trade(self, current_balance: float) -> tuple[bool, str]:
+    def check_can_trade(self, current_balance: float, **kwargs) -> tuple[bool, str]:
         """
         Base risk check — call BEFORE every trade.
         Returns (can_trade: bool, reason: str)
@@ -220,12 +224,28 @@ class RiskManager:
             #     return False, reason
             pass
 
-        return True, "OK"
+        # --- Directional Lockout Check ---
+        direction = kwargs.get("direction", "").upper()
+        if direction and direction == s.last_loss_direction:
+            if time.time() < s.lockout_until:
+                mins_left = int((s.lockout_until - time.time()) // 60)
+                return False, f"Directional Lockout ({direction}) active for {mins_left}m"
+            else:
+                # Lockout expired
+                s.last_loss_direction = ""
+        
+        return True, "Ready"
 
-    def update_after_trade(self, pnl: float):
+    def update_after_trade(self, pnl: float, direction: str = ""):
         """Update internal state after each trade closes. Applies Anti-Martingale sizing."""
         s = self.state
         s.trade_count_today += 1
+        # --- Logical Batch Guard: Keep pyramid orders as 1 logical trade ---
+        last_close_time = getattr(s, "_last_close_time", 0)
+        now = time.time()
+        is_same_batch = (now - last_close_time < 3.0)  # closed within 3s of previous
+        s._last_close_time = now
+        
         if pnl >= 0:
             s.consecutive_losses = 0
             s.wins_today         += 1
@@ -240,13 +260,23 @@ class RiskManager:
             else:
                 logger.info(f"[RiskMgr] Anti-Martingale: Win streak {s.consecutive_wins} — next lot ×{s.anti_martingale_mult:.2f}")
         else:
-            s.consecutive_losses += 1
+            if not is_same_batch:
+                s.consecutive_losses += 1
+                # --- Set Directional Lockout (60 mins) ---
+                if direction:
+                    s.last_loss_direction = direction.upper()
+                    s.lockout_until = time.time() + (60 * 60)
+                    logger.info(f"[RiskMgr] 🛡️ IRON SHIELD: Directional Lockout active for {s.last_loss_direction} (60m)")
+            else:
+                logger.debug("[RiskMgr] Pyramid Batch: Consecutive loss increment skipped.")
+                
             s.consecutive_wins    = 0
             s.daily_loss         += abs(pnl)
             s.losses_today       += 1
             # Anti-Martingale: shrink size by 20% after each loss, floor at 0.5×
             s.anti_martingale_mult = max(s.anti_martingale_mult * 0.80, 0.50)
-            logger.info(f"[RiskMgr] Anti-Martingale: Loss streak {s.consecutive_losses} — next lot ×{s.anti_martingale_mult:.2f}")
+            if not is_same_batch:
+                logger.info(f"[RiskMgr] Anti-Martingale: Loss streak {s.consecutive_losses} — next lot ×{s.anti_martingale_mult:.2f}")
             # Cooldown Circuit Breaker (DISABLED per user request)
             # if s.consecutive_losses == self.cooldown_losses:
             #     cooldown_secs = self.cooldown_minutes * 60
@@ -300,6 +330,7 @@ class RiskManager:
             "consecutive_losses":    s.consecutive_losses,
             "consecutive_wins":      s.consecutive_wins,
             "daily_loss":            round(float(s.daily_loss), 2),  # type: ignore[arg-type]
+            "daily_starting_balance": s.daily_starting_balance,
             "trade_count_today":     s.trade_count_today,
             "wins_today":            s.wins_today,
             "losses_today":          s.losses_today,

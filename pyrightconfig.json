@@ -3,16 +3,21 @@
   "pythonPlatform": "Windows",
   "venvPath": ".",
   "venv": ".venv",
+  "include": [
+    "."
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    ".venv"
+  ],
   "executionEnvironments": [
     {
       "root": ".",
-      "extraPaths": [
-        "./.venv/Lib/site-packages"
-      ]
+      "pythonVersion": "3.9"
     }
   ],
   "typeCheckingMode": "basic",
-  "reportMissingModuleSource": "none",
-  "reportMissingImports": "none",
-  "reportUndefinedVariable": "none"
+  "reportMissingImports": false
 }
+

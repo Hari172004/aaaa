@@ -56,6 +56,7 @@ from strategies.diy_custom_builder import DIYCustomStrategy  # type: ignore
 from filters.world_monitor         import WorldMonitorAPI    # type: ignore
 from analysis.macro_monitor        import MacroMonitor       # type: ignore
 from backend.security.integrity  import checker as integrity_checker # type: ignore
+from strategies.mtf_smc_scalp    import MTFSMCScalpStrategy  # type: ignore
 
 load_dotenv(override=True)
 
@@ -82,9 +83,13 @@ class DashboardLogHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = self.format(record)
-            # Remove timestamp part if it's too long for the dashboard
-            if "|" in msg:
-                msg = msg.split("|", 1)[1].strip()
+            # Only remove metadata prefix if it's in the expected 'Header | Message' format.
+            # We look for ' | ' to distinguish it from pipes within the message itself.
+            if " | " in msg:
+                parts = msg.split(" | ", 1)
+                # If the prefix is short (likely a logger name), we take the message part.
+                if len(parts[0]) < 60:
+                    msg = parts[1].strip()
             self.logs.append(msg)
         except Exception:
             self.handleError(record)
@@ -133,6 +138,7 @@ class BotConfig:
     use_diy_strategy:    bool = True   # Default ON for Gold professional mode
     diy_scalp_config:    str  = "diy_scalp_config.json"
     diy_swing_config:    str  = "diy_swing_config.json"
+    use_mtf_smc:         bool = False  # MTF SMC 3-Gate engine (15m/5m/1m)
 
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -156,6 +162,7 @@ class AgniVBot:
         self._lock    = threading.Lock()
         self._last_daily_reset = date.today()
         self._last_entry_time = 0.0
+        self._last_sentiment = "NEUTRAL"
 
         # ── Core components ───────────────────────────────────────────
         self.mt5      = MT5Connector()
@@ -170,16 +177,27 @@ class AgniVBot:
         self.smc_engine    = SMCEngine()
         self.funded_engine: FundedModeEngine = None  # type: ignore
         self.demo_account:  DemoMode         = None  # type: ignore
+        
+        # ── DIY Strategy (always on) ────────────────────────────────
+        self.diy_scalp = DIYCustomStrategy(config_path=config.diy_scalp_config)
+        self.diy_swing = DIYCustomStrategy(config_path=config.diy_swing_config)
+        logger.info("[Core] DIY Custom Strategy Builder ACTIVE (ZP v1)")
+
+        # ── MTF SMC 3-Gate Engine (15m/5m/1m + BvS Fight) ──────────────
+        self.mtf_smc = MTFSMCScalpStrategy()
+        if config.use_mtf_smc:
+            logger.info("[Core] ⚡ MTF SMC 3-Gate Engine ACTIVE (15m/5m/1m + BvS Fight)")
+
+        self.history      = HistoryStore()
+        self._correlation = CorrelationEngine(self.history)
+        self._smc         = SMCEngine()
+        self.journal      = TradeJournal()
         self.alerts = AlertManager(
             telegram_token   = os.getenv("TELEGRAM_BOT_TOKEN", ""),
             telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", ""),
             gmail_user       = os.getenv("GMAIL_USER", ""),
             gmail_password   = os.getenv("GMAIL_APP_PASSWORD", ""),
         )
-        self.history      = HistoryStore()
-        self._correlation = CorrelationEngine(self.history)
-        self._smc         = SMCEngine()
-        self.journal      = TradeJournal()
 
         # ── Gold components ───────────────────────────────────────────
         self.gold_scalp  = GoldScalpStrategy()
@@ -187,11 +205,6 @@ class AgniVBot:
         self.gold_risk   = GoldRiskManager(config)
         self.gold_alerts = GoldAlerts(self.alerts)
         self.gold_ml     = SignalClassifier(symbol="XAUUSD")
-
-        # ── DIY Strategy (always on) ────────────────────────────────
-        self.diy_scalp = DIYCustomStrategy(config_path=config.diy_scalp_config)
-        self.diy_swing = DIYCustomStrategy(config_path=config.diy_swing_config)
-        logger.info("[Core] DIY Custom Strategy Builder ACTIVE (ZP v1)")
 
         # ── World Monitor Intelligence (Defensive Shield) ──
         self.world_monitor = WorldMonitorAPI()
@@ -345,6 +358,35 @@ class AgniVBot:
         t = threading.Thread(target=_watchdog, daemon=True, name="security-integrity")
         t.start()
 
+    def _start_mt5_reconnect_thread(self):
+        """Background thread that keeps retrying MT5 connection every 30s until successful."""
+        def _reconnect():
+            RETRY_INTERVAL = 30  # seconds
+            attempt = 0
+            while not self.mt5.connected:
+                attempt += 1
+                logger.info(f"[Core] 🔄 MT5 Reconnect attempt #{attempt} in {RETRY_INTERVAL}s...")
+                time.sleep(RETRY_INTERVAL)
+                try:
+                    ok = self.mt5.connect(
+                        self.config.mt5_account,
+                        self.config.mt5_password,
+                        self.config.mt5_server,
+                    )
+                    if ok:
+                        logger.info("[Core] ✅ MT5 Reconnected successfully!")
+                        self._recover_positions()
+                        info = self._get_balance()
+                        self.risk_mgr.on_new_day(info.get("balance", self.config.firm_balance))
+                        break
+                    else:
+                        logger.warning(f"[Core] ⚠️ MT5 reconnect attempt #{attempt} failed.")
+                except Exception as e:
+                    logger.error(f"[Core] MT5 reconnect error: {e}")
+
+        t = threading.Thread(target=_reconnect, daemon=True, name="mt5-reconnect")
+        t.start()
+
     # ── Mode Setup ────────────────────────────────────────────
 
     def _setup_mode(self, config: BotConfig):
@@ -353,10 +395,12 @@ class AgniVBot:
         if cfg.mode in (MODE_REAL, MODE_FUNDED):
             ok = self.mt5.connect(cfg.mt5_account, cfg.mt5_password, cfg.mt5_server)
             if not ok:
-                logger.error("[Core] MT5 connection failed. Position recovery skipped.")
-                return
-            # ── Position Recovery: Adoption of orphan trades ──
-            self._recover_positions()
+                logger.error("[Core] MT5 connection failed on startup. Will auto-retry in background.")
+                # Start background reconnect — don't block startup
+                self._start_mt5_reconnect_thread()
+            else:
+                # ── Position Recovery: Adoption of orphan trades ──
+                self._recover_positions()
 
         if cfg.mode == MODE_DEMO:
             self.demo_account = DemoMode(starting_balance=cfg.firm_balance)
@@ -404,8 +448,22 @@ class AgniVBot:
         )
 
         # Header
-        mode_color = "green" if self.config.mode == MODE_REAL else ("yellow" if self.config.mode == MODE_FUNDED else "cyan")
-        header_text = f"[bold white on blue] AGNI-V GOLD BOT [/]  MODE: [bold {mode_color}]{self.config.mode}[/]  SYMBOL: [bold white]{ASSETS_XAUUSD}[/]  BAL: [bold green]${self.dashboard_state['balance']:.2f}[/]"
+        current_bal = self.dashboard_state.get("balance", 0.0)
+        is_ghost = self.diy_scalp.config.get("ghost_mode", False) if self.diy_scalp else False
+        is_recovery = (current_bal < 100)  # Recovery range: any balance below $100
+        
+        conn_status = "[bold green]CONNECTED[/]" if self.mt5.connected else "[bold red]OFFLINE[/]"
+        if is_ghost:
+            mode_name  = "GHOST SCALP"
+            mode_color = "bold white on purple"
+        elif is_recovery:
+            mode_name  = "RECOVERY"
+            mode_color = "bold yellow on dark_red"
+        else:
+            mode_name  = self.config.mode
+            mode_color = "green" if self.config.mode == MODE_REAL else "cyan"
+        
+        header_text = f"[bold white on blue] AGNI-V GOLD BOT [/]  MODE: [{mode_color}] {mode_name} [/]  MT5: {conn_status}  BAL: [bold green]${current_bal:.2f}[/]"
         layout["header"].update(Panel(Text.from_markup(header_text), style="blue", box=box.ROUNDED))
 
         # Main Table (Ultimate Scalping Tool)
@@ -464,6 +522,47 @@ class AgniVBot:
         sent_style = "bold white on green" if sent_val == "BULLISH" else ("bold white on red" if sent_val == "BEARISH" else "dim white")
         table.add_row("News Sentiment", f"[{sent_style}] {sent_val} [/]")
 
+        # --- News Shield Status ---
+        ns = self.dashboard_state.get("news_shield", {"active": False})
+        if ns.get("active"):
+            ns_val = f"BLOCKING: {ns.get('event')}"
+            ns_style = "bold white on red"
+        else:
+            ns_val = "Secure"
+            if ns.get("event") and ns.get("starts_in") is not None:
+                ns_val = f"T-Minus {ns.get('starts_in') // 60}m to {ns.get('event')}"
+            ns_style = "bold white on green"
+        table.add_row("News Shield", f"[{ns_style}] {ns_val} [/]")
+
+        # ── 3-Gate MTF SMC Status ──────────────────────────────────────────
+        if self.config.use_mtf_smc:
+            gate_data = self.dashboard_state.get("mtf_gates", {})
+
+            # Gate 1: 15m Direction
+            g1_bias  = gate_data.get("g1_bias", "---")
+            g1_ema200 = gate_data.get("g1_ema200", 0.0)
+            g1_style = "bold white on green" if g1_bias == "BULLISH" else (
+                        "bold white on red"   if g1_bias == "BEARISH" else "dim white")
+            table.add_row("Gate1 15m",
+                          f"[{g1_style}] {g1_bias} [/]"
+                          f" [dim]EMA200={g1_ema200:.0f}[/]")
+
+            # Gate 2: 5m Setup
+            g2_setup   = gate_data.get("g2_setup", "---")
+            g2_bos     = gate_data.get("g2_bos", False)
+            g2_choch   = gate_data.get("g2_choch", False)
+            g2_passed  = gate_data.get("g2_passed", False)
+            g2_style   = "bold white on green" if g2_passed else "bold white on red"
+            g2_flags   = (" BOS" if g2_bos else "") + (" CHoCH" if g2_choch else "")
+            table.add_row("Gate2 5m",
+                          f"[{g2_style}] {g2_setup}{g2_flags} [/]")
+
+            # Gate 3: 1m Confirmation
+            g3_trigger = gate_data.get("g3_trigger", "---")
+            g3_passed  = gate_data.get("g3_passed", False)
+            g3_style   = "bold white on green" if g3_passed else "bold white on red"
+            table.add_row("Gate3 1m", f"[{g3_style}] {g3_trigger} [/]")
+
         layout["body"].update(table)
 
         # Logs Panel
@@ -490,6 +589,10 @@ class AgniVBot:
             # Setup Dashboard
             with Live(self._make_layout(), refresh_per_second=2, screen=True) as live:
                 while self._running:
+                    # Refresh balance at start of every cycle
+                    balance_data = self._get_balance()
+                    self.dashboard_state["balance"] = float(balance_data.get("balance", 0.0))
+                    
                     # Run Daily Reset Check
                     self._run_daily_reset()
 
@@ -510,13 +613,23 @@ class AgniVBot:
                     # Update Dashboard
                     live.update(self._make_layout())
                     time.sleep(1) # Refresh every second
-
-    # ── Symbol Processing ─────────────────────────────────────
+# ── Symbol Processing ─────────────────────────────────────
 
     def _process_symbol(self, symbol: str):
         """Full signal pipeline for one XAUUSD tick."""
-        # 1. News sentiment
+        # 1. News sentiment & Blackout
         sentiment       = self.news.get_sentiment(symbol)
+        
+        # 1.1 News Shield Check (15m before/after)
+        blackout = self.news.get_blackout_status(window_before_mins=15, window_after_mins=15)
+        self.dashboard_state["news_shield"] = blackout
+        
+        if blackout.get("active"):
+            event_name = blackout.get("event", "Unknown Event")
+            ends_in_min = (blackout.get("ends_in", 0) or 0) // 60
+            logger.warning(f"[Core] 🛡️ NEWS SHIELD ACTIVE: {event_name} (Ends in {ends_in_min}m). Trading Paused.")
+            return
+
         upcoming_events = sentiment.get("high_impact_events", [])
         sent_label      = sentiment.get("label", "NEUTRAL")
 
@@ -555,11 +668,19 @@ class AgniVBot:
         # 6. Sentiment blend
         final_signal = self._blend_signal(signal, sent_label)
 
-        logger.info(
-            f"[Core] XAUUSD | Strategy={strategy_mode} | Signal={signal} "
-            f"| Sentiment={sent_label} | Final={final_signal} "
-            f"| Strength={strength:.0%} | {signal_data.get('reason', '')}"
-        )
+        if sent_label != self._last_sentiment:
+            logger.info(
+                f"[News] Sentiment={sent_label} ({sentiment.get('score', 0):+.3f}) "
+                f"| HighImpact={len(upcoming_events)}"
+            )
+            self._last_sentiment = sent_label
+
+        if final_signal != "HOLD":
+            logger.info(
+                f"[Core] XAUUSD | Strategy={strategy_mode} | Signal={signal} "
+                f"| Sentiment={sent_label} | Final={final_signal} "
+                f"| Strength={strength:.0%} | {signal_data.get('reason', '')}"
+            )
 
         # Update Dashboard State
         self.dashboard_state["balance"] = current_bal
@@ -596,7 +717,8 @@ class AgniVBot:
                         self.mt5.close_position(ticket)
                     self._play_sound("exit")
 
-        if final_signal == "HOLD" or strength < 0.5:
+        # Recovery Mode: Strict Selection (60% strength)
+        if final_signal == "HOLD" or strength < 0.6:
             return
 
         # 7. ML filter
@@ -615,10 +737,10 @@ class AgniVBot:
             ai_approved = True
             logger.info(f"[Core] XAUUSD | AI confirmation BYPASSED")
         else:
-            threshold = 0.75 if current_bal < 500 else 0.70
+            threshold = 0.75 if current_bal < 100 else 0.70
             ml_res = self.gold_ml.predict_signal(ml_input)
             if strength >= 0.95:
-                logger.info(f"[Core] XAUUSD | 🔥 PERFECT SETUP ({strength:.0%}) — bypassing AI")
+                logger.info(f"[Core] XAUUSD | 🔥 RECOVERY SETUP ({strength:.0%}) — bypassing AI")
                 ai_approved = True
             elif ml_res["confidence"] < threshold:
                 logger.warning(
@@ -650,6 +772,10 @@ class AgniVBot:
         #     return
 
         # 10. Pre-trade guards
+        # --- News Shield Double-Check ---
+        if blackout.get("active"):
+             return False, f"News Shield: {blackout.get('event')}"
+
         can_trade, reason = self._check_all_guards(
             upcoming_events, symbol, final_signal, strategy=strategy_mode, ai_approved=ai_approved
         )
@@ -693,9 +819,10 @@ class AgniVBot:
         tp = entry + (sl_val * 2.5) if final_signal == "BUY" else entry - (sl_val * 2.5)
 
         # 12. Signal alert (broadcast to Telegram/email)
+        is_recovery = (current_bal < 50)
         self.gold_alerts.signal_alert(
             symbol, final_signal, strategy_mode, signal_data.get("reason", ""),
-            entry=entry, sl=sl, tp=tp
+            entry=entry, sl=sl, tp=tp, is_recovery=is_recovery
         )
 
         # 13. News boost — widen TP on aligned sentiment
@@ -818,14 +945,67 @@ class AgniVBot:
             ignore_sess = self.config.sniper_mode or (self.config.strategy == STRATEGY_SCALP) or micro_scalp
             is_sniper   = self.config.sniper_mode
 
+            # ── MTF SMC 3-Gate Engine (highest priority if enabled) ──────────
+            if self.config.use_mtf_smc and strategy_mode == STRATEGY_SCALP:
+                if self.config.mode == MODE_DEMO and not self.mt5.connected:
+                    df_15m = self.history.get_candles(symbol, "M15", 150)
+                    df_5m  = self.history.get_candles(symbol, "M5",  200)
+                    df_1m  = self.history.get_candles(symbol, "M1",  100)
+                else:
+                    df_15m = self.mt5.get_ohlcv(symbol, "M15", 150)
+                    df_5m  = self.mt5.get_ohlcv(symbol, "M5",  200)
+                    df_1m  = self.mt5.get_ohlcv(symbol, "M1",  100)
+
+                if not df_15m.empty and not df_5m.empty and not df_1m.empty:
+                    mtf_res = self.mtf_smc.generate_signal(df_15m, df_5m, df_1m)
+                    mtf_sig = mtf_res.get("signal", "HOLD")
+
+                    # ── Store gate details for dashboard ───────────────
+                    g1 = mtf_res.get("gate1", {})
+                    g2 = mtf_res.get("gate2", {})
+                    g3 = mtf_res.get("gate3", {})
+                    self.dashboard_state["mtf_gates"] = {
+                        "g1_bias":    g1.get("bias", "---"),
+                        "g1_ema200":  g1.get("ema200", 0.0),
+                        "g1_trend":   g1.get("trend", "---"),
+                        "g2_passed":  g2.get("passed", False),
+                        "g2_setup":   g2.get("setup_type", "---"),
+                        "g2_bos":     g2.get("has_bos", False),
+                        "g2_choch":   g2.get("has_choch", False),
+                        "g2_sweep":   g2.get("has_sweep", False),
+                        "g3_passed":  g3.get("passed", False),
+                        "g3_trigger": g3.get("trigger", "---"),
+                    }
+
+                    logger.info(
+                        f"[Core] {symbol} | \u26a1 MTF-SMC signal={mtf_sig} "
+                        f"strength={mtf_res.get('strength', 0):.0%} "
+                        f"| {mtf_res.get('reason', '')}"
+                    )
+                    if mtf_sig != "HOLD":
+                        real_atr = mtf_res.get("atr") or float((df_5m["high"].tail(14) - df_5m["low"].tail(14)).mean())
+                        return {
+                            "signal":         mtf_sig,
+                            "atr":            real_atr,
+                            "strength":       mtf_res.get("strength", 0.75),
+                            "reason":         mtf_res.get("reason", ""),
+                            "sl_distance":    mtf_res.get("sl_distance", real_atr * 1.5),
+                            "tp_distance":    mtf_res.get("tp_distance", real_atr * 3.0),
+                            "mtf_confluence": 5,
+                        }
+                    # MTF said HOLD — fall through to DIY/GoldScalp below
+                else:
+                    logger.warning("[Core] MTF-SMC: TF data empty, falling back to DIY")
+
             # ── DIY Strategy override (if enabled) ──────────────
             if self.config.use_diy_strategy and self.diy_scalp is not None:
                 diy_strat  = self.diy_scalp if strategy_mode == STRATEGY_SCALP else self.diy_swing
                 
-                # Ensure we have H1 data for trend confluence
-                df_h1 = self.mt5.get_ohlcv(symbol, "H1", 200)
+                # Fetch M5 for Scalp HTF trend, otherwise H1 for Swing
+                htf_tf = "M5" if strategy_mode == STRATEGY_SCALP else "H1"
+                df_htf = self.mt5.get_ohlcv(symbol, htf_tf, 200)
                 
-                diy_signal = diy_strat.generate_signal(df, df_h1=df_h1)
+                diy_signal = diy_strat.generate_signal(df, df_h1=df_htf, super_sensitive=False)
                 status     = diy_strat.get_status()
                 logger.info(
                     f"[Core] {symbol} | DIY Strategy signal={diy_signal} "
@@ -864,6 +1044,10 @@ class AgniVBot:
 
     def _check_all_guards(self, upcoming_events: list, symbol: str, direction: str,
                           strategy: str = "SCALP", ai_approved: bool = False) -> tuple:
+        bal_data = self._get_balance()
+        current_bal = float(bal_data.get("balance", 100))
+        is_recovery = (current_bal < 50)
+
         open_pos  = self._get_open_positions()
         gold_pos  = [p for p in open_pos
                      if p.get("symbol") in (ASSETS_XAUUSD, self.mt5.map_symbol(ASSETS_XAUUSD))]
@@ -882,26 +1066,36 @@ class AgniVBot:
             return False, msg
 
         # ── Round Number Safety Guard (Psychological Levels) ──
-        # Block entries too close to major whole numbers (e.g. 4800.00)
-        # 0.50 point (50 bip) buffer for Gold
-        price = self.mt5.get_tick(symbol).get("bid") if direction == "BUY" else self.mt5.get_tick(symbol).get("ask")
-        if price:
-            nearest_whole = round(price)
-            distance = abs(price - nearest_whole)
-            if distance < 0.50:
-                # If SELL and we are below the level (e.g. 4799.90)
-                if direction == "SELL" and price < nearest_whole:
-                    msg = f"Round Number Magnet: Too close to {nearest_whole}.00 resistance (dist={distance:.2f})"
-                    logger.warning(f"[PROTECTION] 🛡️ Trade blocked: {msg}")
-                    return False, msg
-                # If BUY and we are above the level (e.g. 4800.10)
-                if direction == "BUY" and price > nearest_whole:
-                    msg = f"Round Number Magnet: Too close to {nearest_whole}.00 support (dist={distance:.2f})"
-                    logger.warning(f"[PROTECTION] 🛡️ Trade blocked: {msg}")
-                    return False, msg
+        is_ghost = self.diy_scalp.config.get("ghost_mode", False) if self.diy_scalp else False
+        if is_ghost:
+             # Ghosts ignore magnets to maintain high frequency
+             pass
+        else:
+            price = self.mt5.get_tick(symbol).get("bid") if direction == "BUY" else self.mt5.get_tick(symbol).get("ask")
+            if price:
+                nearest_whole = round(price)
+                distance = abs(price - nearest_whole)
+                if distance < 0.15:
+                    # If SELL and we are below the level (e.g. 4799.90)
+                    if direction == "SELL" and price < nearest_whole:
+                        msg = f"Round Number Magnet: Too close to {nearest_whole}.00 resistance (dist={distance:.2f})"
+                        logger.warning(f"[PROTECTION] 🛡️ Trade blocked: {msg}")
+                        return False, msg
+                    # If BUY and we are above the level (e.g. 4800.10)
+                    if direction == "BUY" and price > nearest_whole:
+                        msg = f"Round Number Magnet: Too close to {nearest_whole}.00 support (dist={distance:.2f})"
+                        logger.warning(f"[PROTECTION] 🛡️ Trade blocked: {msg}")
+                        return False, msg
 
         # Global concurrency cap
-        global_limit = 3 if strategy == STRATEGY_SCALP else (2 if ai_approved else 1)
+        is_ghost = self.diy_scalp.config.get("ghost_mode", False) if self.diy_scalp else False
+        if current_bal < 50:
+            global_limit = 2 if is_ghost else 1
+        elif current_bal < 100:
+            global_limit = 4  # Normal Recovery
+        else:
+            global_limit = 7
+            
         if len(open_pos) >= global_limit:
             return False, f"Max global positions ({global_limit}) reached"
 
@@ -912,10 +1106,13 @@ class AgniVBot:
             logger.warning(f"[PROTECTION] 🛡️ Trade blocked: {msg}")
             return False, msg
 
-        # ── Entry Cooldown Guard (REMOVED: allowing continuous back-to-back firing)
-        # elapsed = time.time() - self._last_entry_time
-        # if elapsed < 30:
-        #     return False, f"Entry cooldown active ({int(30 - elapsed)}s remaining)"
+        # ── Entry Cooldown Guard — always 60s, no bypass
+        cooldown = 60
+        elapsed = time.time() - self._last_entry_time
+        if elapsed < cooldown:
+             msg = f"Entry cooldown active ({int(cooldown - elapsed)}s remaining)"
+             logger.info(f"[PROTECTION] ⏳ {msg}")
+             return False, msg
 
         # Asian session guard for scalp (22–07 UTC low volume)
         # REMOVED for 24/5 trading
@@ -932,7 +1129,7 @@ class AgniVBot:
 
         # Base risk manager
         balance = self._get_balance().get("balance", 0)
-        ok, reason = self.risk_mgr.check_can_trade(balance)
+        ok, reason = self.risk_mgr.check_can_trade(balance, direction=direction)
         if not ok:
             return False, reason
 
@@ -1067,17 +1264,28 @@ class AgniVBot:
                     logger.info(f"[Core] 📝 Journaling #{ticket} | PnL=${pnl:.2f} | Reason={info.get('reason', 'Exit')}")
                     self.journal.log_close(j_id, pnl, info.get("reason", "Exit"))
 
+                # Update Risk Manager with direction for lockout detection
+                self.risk_mgr.update_after_trade(pnl, direction=meta.get("direction", ""))
+                
+                # Fetch Stats for Alert Enrichment
+                stats = self.risk_mgr.stats()
+                bal_data = self._get_balance()
+                current_bal = float(bal_data.get("balance", 0))
+                start_bal = stats.get("daily_starting_balance", current_bal)
+                daily_pnl = current_bal - start_bal if start_bal > 0 else 0
+
                 # Send Alert via Centralised Manager
                 self.alerts.trade_closed({
                     "ticket":      ticket,
                     "symbol":      meta["symbol"],
                     "pnl":         pnl,
                     "exit_reason": info.get("reason", "Exit"),
-                    "strategy":    meta.get("strategy", "N/A")
+                    "strategy":    meta.get("strategy", "N/A"),
+                    "balance":     current_bal,
+                    "daily_pnl":   daily_pnl,
+                    "deposit":     start_bal,
+                    "trades_today": stats.get("trade_count_today", 0)
                 })
-
-                # Update Risk Manager
-                self.risk_mgr.update_after_trade(pnl)
 
                 del self._real_positions[ticket]  # type: ignore
                 self._play_sound("exit")
@@ -1101,57 +1309,60 @@ class AgniVBot:
                 self.mt5.close_position(ticket)
                 continue
 
-            # ── 2. 3-Level TP Ladder (Zignaly / 3Commas style) ───────────
-            initial_risk = abs(meta["entry"] - meta.get("initial_sl", meta["sl"]))
+            # ── 2. Gold Recovery Ladder (5-pip BE / 7-pip TP) ─────────────
             if meta["direction"] == "BUY":
                 profit_amount = current - meta["entry"]
             else:
                 profit_amount = meta["entry"] - current
+            
+            # ── Ultra-Scalp Exit: $0.20 Target for Small Accounts ──────────
+            pos = self.mt5.positions_get(ticket=ticket) if is_scalp else None
+            cur_vol = pos[0].volume if pos and len(pos) > 0 else 0
+            
+            profit_usd = profit_amount * 100 * cur_vol
+            current_bal = self.mt5.get_account_info().get("balance", 0.0)
+            
+            if current_bal < 50 and profit_usd >= 1.00:
+                logger.info(f"[Core] ⚡ ULTRA-SCALP: Closing #{ticket} at $1.00 Hard TP")
+                self.mt5.close_position(ticket)
+                continue
+            
+            # Gold: 1 point = 10 pips. 0.7 points = 7 pips.
+            initial_risk = abs(meta["entry"] - meta.get("initial_sl", meta["sl"]))
+            pips = profit_amount / 0.1
             profit_r = profit_amount / initial_risk if initial_risk > 0 else 0
 
             pos = self.mt5.positions_get(ticket=ticket) if is_scalp else None
             cur_vol = pos[0].volume if pos and len(pos) > 0 else 0
 
-            # Level 1: At 1R → close 30%, move SL to Break-Even
-            if is_scalp and profit_r >= 1.0 and not meta.get("partial_closed_1r") and cur_vol > 0:
-                close_vol = round(cur_vol * 0.30, 2)
+            # Zero-Risk Move: At 5 pips → move SL to Break-Even
+            if is_scalp and pips >= 5.0 and not meta.get("moved_be") and cur_vol > 0:
+                self.mt5.modify_sl_tp(ticket, meta["entry"], meta["tp"])
+                meta["moved_be"] = True
+                meta["sl"] = meta["entry"]
+                logger.info(f"[Core] 🛡️ BE-MOVE: Account protection active at 5 pips profit | #{ticket} SL → B/E")
+
+            # TP Level 1: At 7 pips → close 50%
+            if is_scalp and pips >= 7.0 and not meta.get("partial_closed_1r") and cur_vol > 0:
+                close_vol = round(cur_vol * 0.50, 2)
                 if close_vol >= 0.01:
                     ok = self.mt5.close_position(ticket, volume=close_vol)
                     if ok:
-                        self.mt5.modify_sl_tp(ticket, meta["entry"], meta["tp"])  # → Break-Even
                         meta["partial_closed_1r"] = True
-                        meta["sl"] = meta["entry"]
-                        logger.info(f"[Core] 🎯 TP-L1 (1R): Closed 30% of #{ticket} | SL → B/E")
+                        logger.info(f"[Core] 🎯 TP-FAST (7 pips): Closed 50% of #{ticket} | Secure Profit")
                 else:
                     # Bug fix for 0.01 lots: secure B/E even if we can't partial close
-                    ok = self.mt5.modify_sl_tp(ticket, meta["entry"], meta["tp"])
-                    if ok:
-                        meta["partial_closed_1r"] = True
+                    if not meta.get("moved_be"):
+                        self.mt5.modify_sl_tp(ticket, meta["entry"], meta["tp"])
+                        meta["moved_be"] = True
                         meta["sl"] = meta["entry"]
-                        logger.info(f"[Core] 🎯 TP-L1 (1R): Micro-lot secured | SL → B/E")
-                continue
-
-            # Level 2: At 2R → close another 30%, trail SL to 1R profit
-            if is_scalp and profit_r >= 2.0 and meta.get("partial_closed_1r") \
-                    and not meta.get("partial_closed_2r") and cur_vol > 0:
-                close_vol = round(cur_vol * 0.30, 2)
-                one_r_profit_sl = (
-                    meta["entry"] + initial_risk if meta["direction"] == "BUY"
-                    else meta["entry"] - initial_risk
-                )
-                if close_vol >= 0.01:
-                    ok = self.mt5.close_position(ticket, volume=close_vol)
-                    if ok:
-                        self.mt5.modify_sl_tp(ticket, one_r_profit_sl, meta["tp"])  # → Lock 1R
-                        meta["partial_closed_2r"] = True
-                        meta["sl"] = one_r_profit_sl
-                        logger.info(f"[Core] 🎯 TP-L2 (2R): Closed 30% of #{ticket} | SL → +1R locked")
+                        logger.info(f"[Core] 🎯 TP-FAST: B/E secured on micro-lot")
                 continue
 
             # Level 3: At 3R → let remaining 40% run with tight 0.5R trail
             # (handled by trailing SL below with tighter threshold)
 
-            # ── 3. Trailing SL for the remaining position ────────────────
+            # ── 3. Smart SL Tracking & Cooldown ────────────────────────
             # Use tighter trail (0.4R) to lock in profit earlier
             be_threshold  = 0.4 if is_scalp else None
             trail_dist    = 0.4 if is_scalp else 1.0
@@ -1171,11 +1382,31 @@ class AgniVBot:
                 override_breakeven_r=be_threshold,
                 trail_distance_r=trail_dist
             )
-            if should_move and new_sl != meta["sl"]:
-                ok = self.mt5.modify_sl_tp(ticket, new_sl, meta["tp"])
+            
+            # --- Dynamic Smart-SL Cooldown ---
+            regime = self.dashboard_state["metrics"].get("regime", "Low")
+            mod_cooldown = 20.0 if "High" in regime else 2.0
+            
+            # --- Min-Step Guard: Protect from broker spam (min 0.1 pts / 1 pip) ---
+            sl_delta = abs(new_sl - meta["sl"])
+            is_significant = sl_delta >= 0.1
+            
+            last_mod_time = meta.get("last_mod_attempt", 0)
+            elapsed = time.time() - last_mod_time
+            
+            if should_move and is_significant and (elapsed > mod_cooldown):
+                meta["last_mod_attempt"] = time.time()
+                ok, status = self.mt5.modify_sl_tp(ticket, new_sl, meta["tp"])
+                
                 if ok:
                     self._real_positions[ticket]["sl"] = new_sl
-                    logger.info(f"[Core] 🔒 Trail SL moved | #{ticket} | NewSL={new_sl:.5f} | Profit={profit_r:.1f}R")
+                    logger.info(f"[Core] 🔒 [SMART-SL] Moved | #{ticket} | NewSL={new_sl:.5f} | Profit={profit_r:.1f}R")
+                elif status == "PROXIMITY":
+                    # Proximity block — log silently to status but don't spam terminal
+                    logger.debug(f"[Core] 🛡️ [SMART-SL] Blocked (proximity): #{ticket}")
+                else:
+                    # Generic failure — wait 2s before retry (handled by mod_cooldown)
+                    logger.debug(f"[Core] ⚠️ [SMART-SL] Blocked (error): {status}")
 
     # ── Helpers ───────────────────────────────────────────────
 
@@ -1185,7 +1416,9 @@ class AgniVBot:
             return {"balance": info["balance"], "equity": info["equity"]}
         if self.mt5.connected:
             return self.mt5.get_account_info()
-        return {"balance": self.config.firm_balance, "equity": self.config.firm_balance}
+        # Fallback to 0.0 in REAL/DEMO mode to avoid confusing shadow balances
+        fallback = self.config.firm_balance if self.config.mode == MODE_FUNDED else 0.0
+        return {"balance": fallback, "equity": fallback}
 
     def _get_tick(self, symbol: str) -> dict:
 

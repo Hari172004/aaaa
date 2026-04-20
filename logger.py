@@ -143,13 +143,23 @@ class AlertManager:
         ticket    = trade.get("ticket", "")
         strategy  = trade.get("strategy", "N/A")
         
+        balance   = trade.get("balance", 0.0)
+        daily_pnl = trade.get("daily_pnl", 0.0)
+        deposit   = trade.get("deposit", 0.0)
+        trades    = trade.get("trades_today", 0)
+        
         emoji     = "✅" if pnl >= 0 else "❌"
         msg = (
             f"{emoji} <b>Trade Closed #{ticket}</b>\n"
             f"Asset: <code>{symbol}</code>\n"
             f"PnL: <b>${pnl:+.2f}</b>\n"
             f"Exit: <code>{exit_rsn}</code>\n"
-            f"Strategy: <code>{strategy}</code>\n"
+            f"Strategy: <code>{strategy}</code>\n\n"
+            f"📈 <b>Session Stats:</b>\n"
+            f"Trades Today: <code>{trades}</code>\n"
+            f"Start Balance: <code>${deposit:,.2f}</code>\n"
+            f"Current Bal: <code>${balance:,.2f}</code>\n"
+            f"Session PnL: <b>${daily_pnl:+.2f}</b>\n"
             f"🕐 {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
         )
         self.send_telegram(msg)

@@ -23,6 +23,7 @@ TIMEFRAME_MAP = {
 # Symbol mapping: internal name → MT5 symbol name
 SYMBOL_MAP = {
     "XAUUSD": os.getenv("GOLD_SYMBOL", "GOLD"),
+    "GOLD":   os.getenv("GOLD_SYMBOL", "GOLD"),
 }
 
 
@@ -34,30 +35,52 @@ class MT5Connector:
         # Resolve terminal path from environment if not provided
         if not path:
             path = os.getenv("MT5_PATH", "")
-            
-        # Try initializing with explicit credentials and path if provided
-        init_ok = False
-        if account != 0 and password:
-            init_ok = mt5.initialize(login=account, password=password, server=server, path=path)
-        
-        if not init_ok:
-            # Fallback to default initialization if explicit failed or wasn't tried
-            if not mt5.initialize(path=path):
-                err = mt5.last_error()
-                logger.error(f"MT5 initialize() failed. Path: {path}, Error: {err}")
-                return False
-            
-            # If we initialized but hadn't logged in yet, do it now
+
+        # ── Retry loop: MT5 IPC pipe can take time to open after terminal launch ──
+        MAX_RETRIES = 5
+        RETRY_DELAY = 8  # seconds between attempts
+        TIMEOUT_MS  = 30000  # 30s — gives terminal enough time to initialize IPC
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            logger.info(f"[MT5] Connection attempt {attempt}/{MAX_RETRIES} | Path: {path or 'default'}")
+            mt5.shutdown()  # Always clean slate before retry
+
+            init_ok = False
             if account != 0 and password:
-                if not mt5.login(account, password=password, server=server):
-                    logger.error(f"MT5 login failed: {mt5.last_error()}")
-                    mt5.shutdown()
-                    return False
-        info = mt5.account_info()  # type: ignore
-        logger.info(f"MT5 Connected | #{info.login} | ${info.balance:.2f} | {info.server}")
-        self.connected = True
-        self.auto_discover_symbols()
-        return True
+                init_ok = mt5.initialize(
+                    login=account, password=password,
+                    server=server, path=path, timeout=TIMEOUT_MS
+                )
+
+            if not init_ok:
+                # Fallback: init without explicit login first, then log in
+                init_ok = mt5.initialize(path=path, timeout=TIMEOUT_MS)
+                if init_ok and account != 0 and password:
+                    if not mt5.login(account, password=password, server=server):
+                        logger.warning(f"[MT5] Login failed on attempt {attempt}: {mt5.last_error()}")
+                        mt5.shutdown()
+                        init_ok = False
+
+            if init_ok:
+                info = mt5.account_info()  # type: ignore
+                if info:
+                    logger.info(f"MT5 Connected | #{info.login} | ${info.balance:.2f} | {info.server}")
+                    self.connected = True
+                    self.auto_discover_symbols()
+                    return True
+                else:
+                    logger.warning(f"[MT5] init_ok but account_info() returned None on attempt {attempt}")
+            else:
+                err = mt5.last_error()
+                logger.warning(f"[MT5] Attempt {attempt}/{MAX_RETRIES} failed: {err}")
+
+            if attempt < MAX_RETRIES:
+                import time as _time
+                logger.info(f"[MT5] Retrying in {RETRY_DELAY}s...")
+                _time.sleep(RETRY_DELAY)
+
+        logger.error(f"[MT5] All {MAX_RETRIES} connection attempts failed. Running in OFFLINE mode.")
+        return False
 
     def auto_discover_symbols(self):
         """
@@ -78,10 +101,11 @@ class MT5Connector:
         for cand in gold_candidates:
             if cand.upper() in available_names:
                 exact_name = raw_names[available_names.index(cand.upper())]
-                mt5.symbol_select(exact_name, True)  # type: ignore
+                mt5.symbol_select(exact_name, True)  # Ensure it is in Market Watch
                 SYMBOL_MAP["XAUUSD"] = exact_name
-                print(f"[Broker] Universal Mapper: mapped XAUUSD -> {exact_name}")
-                logger.info(f"[Broker] Universal Mapper: mapped XAUUSD -> {exact_name}")
+                SYMBOL_MAP["GOLD"]   = exact_name
+                print(f"[Broker] Universal Mapper: mapped XAUUSD/GOLD -> {exact_name}")
+                logger.info(f"[Broker] Universal Mapper: mapped XAUUSD/GOLD -> {exact_name}")
                 break
 
 
@@ -196,6 +220,27 @@ class MT5Connector:
 
     def modify_sl_tp(self, ticket: int, sl: float, tp: float) -> bool:
         """Modifies both SL and TP for an existing position. MT5 requires both to keep them."""
+        # ── Stop Level Safety Check ──
+        pos = mt5.positions_get(ticket=ticket)
+        if not pos: return False
+        symbol = pos[0].symbol
+        info = mt5.symbol_info(symbol)
+        tick = mt5.symbol_info_tick(symbol)
+        
+        if info and tick:
+            # Stop Level is in points (e.g. 20 points on Gold = $0.20)
+            # Fix: different MT5/Broker versions use stops_level or trade_stops_level
+            stops_level = getattr(info, "stops_level", getattr(info, "trade_stops_level", 0))
+            min_dist = stops_level * info.point
+            current_price = tick.bid if pos[0].type == mt5.ORDER_TYPE_BUY else tick.ask
+            
+            # Check SL proximity
+            if sl != 0:
+                dist = abs(current_price - sl)
+                if dist < min_dist:
+                    # Too close! Don't even send the request.
+                    return False, "PROXIMITY"
+        
         request = {
             "action":   mt5.TRADE_ACTION_SLTP,
             "position": ticket,
@@ -204,9 +249,12 @@ class MT5Connector:
         }
         result = mt5.order_send(request)  # type: ignore
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            logger.error(f"[MT5] Modification failed: {result.comment}")
-            return False
-        return True
+            # Suppress noisy error logs for common proximity rejections
+            if result.retcode == mt5.TRADE_RETCODE_INVALID_STOPS:
+                return False, "PROXIMITY"
+            logger.error(f"[MT5] Modification failed: {result.comment} (SL: {sl}, TP: {tp}, Retcode: {result.retcode})")
+            return False, result.comment
+        return True, "DONE"
 
     def get_closed_trade_info(self, ticket: int) -> dict:
         """Fetches profit and closing reason for a specific position ticket from history."""

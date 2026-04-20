@@ -8,7 +8,9 @@ import logging
 import threading
 import time
 from datetime import datetime, timezone
-import yfinance as yf # type: ignore
+
+# Lazy import inside the class to prevent startup hang
+yf = None
 
 logger = logging.getLogger("agniv.macro_monitor")
 
@@ -42,6 +44,16 @@ class MacroMonitor:
             self._stop_event.wait(self.interval)
 
     def _update_data(self):
+        global yf
+        if yf is None:
+            try:
+                import yfinance as _yf
+                yf = _yf
+                logger.info("[Macro] yfinance library loaded in background.")
+            except Exception as e:
+                logger.warning(f"[Macro] Could not load yfinance: {e}")
+                return
+
         # 1. Fetch TNX (10Y Yield)
         tnx_ticker = yf.Ticker("^TNX")
         tnx_hist = tnx_ticker.history(period="1d", interval="1m")

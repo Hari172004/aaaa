@@ -42,7 +42,9 @@ if __name__ == "__main__":
 
     leverage = int(os.getenv("BOT_LEVERAGE", "1000"))
 
-    console.print(f"\n[bold green]🚀 Launching with Strategy:[/] [bold white]{selected_strategy}[/]\n")
+    console.print(f"\n[bold green]>>> Launching with Strategy:[/] [bold white]{selected_strategy}[/]\n")
+
+    use_mtf_smc = os.getenv("USE_MTF_SMC", "true").lower() == "true"
 
     config = BotConfig(
         mode              = os.getenv("BOT_MODE", "REAL"),
@@ -61,9 +63,13 @@ if __name__ == "__main__":
         use_diy_strategy      = True,
         diy_scalp_config      = "diy_scalp_config.json",
         diy_swing_config      = "diy_swing_config.json",
+        use_mtf_smc           = use_mtf_smc,
     )
 
+    console.print("[bold cyan]\n⚙️  Initialising Agni-V engine... (this takes ~10s)[/]")
+    console.print("[dim]  → Loading AI models, connecting MT5, building strategy...[/]")
     bot = AgniVBot(config)
+    console.print("[bold green]✅ Engine ready![/]")
 
     # ── Telegram command handler ─────────────────────────────────────────
     try:
@@ -83,14 +89,22 @@ if __name__ == "__main__":
         tg_enabled = False
 
     # ── Start bot main loop ──────────────────────────────────────────────
+    console.print("[bold cyan]🚀 Starting trading loop...[/]")
     bot_thread = threading.Thread(target=bot.start, daemon=True, name="AgniVCore")
     bot_thread.start()
+    console.print("[bold green]✅ Bot loop active.[/]")
+
+    # ── Console 2FA Notification ─────────────────────────────────────────
+    if config.mode in ("REAL", "FUNDED") and os.getenv("BYPASS_2FA", "false").lower() != "true":
+        console.print("[bold yellow]⏳ Waiting for 2FA approval on Telegram...[/]")
+        console.print("[dim]Please check your Telegram bot and send /authorize[/]\n")
 
     # ── Startup Telegram notification ────────────────────────────────────
     def _startup_notify():
         strat_label = {"SCALP": "⚡ SCALP (M5 · DIY Builder)", "SWING": "🎯 SWING (H4 · DIY Builder)"}.get(
             selected_strategy, selected_strategy
         )
+        mtf_label = "15m→5m→1m [3-Gate SMC]" if use_mtf_smc else "DIY Builder"
         time.sleep(2)
         try:
             bot.alerts.send_telegram(
@@ -99,6 +113,7 @@ if __name__ == "__main__":
                 f"📈 Asset:     <code>XAUUSD (Gold)</code>\n"
                 f"🎯 Strategy:  <code>{strat_label}</code>\n"
                 f"⚙️  Mode:      <code>{config.mode}</code>\n"
+                f"🧠 Engine:    <code>{mtf_label}</code>\n"
                 f"📦 Pyramid:   <code>Up to 5 orders on strong signals</code>\n"
                 f"🔫 Sniper:    <code>{'ON' if config.sniper_mode else 'OFF'}</code>\n\n"
                 f"Live Gold signals active! 🚀🥇"
@@ -131,6 +146,10 @@ if __name__ == "__main__":
             time.sleep(30 * 60)
 
     threading.Thread(target=_heartbeat_loop, daemon=True, name="Heartbeat").start()
+    console.print("[bold green]✅ Heartbeat monitor active.[/]")
+    console.print("[bold white]─────────────────────────────────────────────────[/]")
+    console.print("[bold yellow]🟢 Agni-V is LIVE. Dashboard launching... Press Ctrl+C to stop.[/]")
+    console.print("[bold white]─────────────────────────────────────────────────[/]")
 
     logging.info(f"[Startup] Agni-V Gold Bot running | Mode={config.mode} | Strategy={selected_strategy}")
 
@@ -142,6 +161,22 @@ if __name__ == "__main__":
             time.sleep(5)
     except KeyboardInterrupt:
         logging.info("Stopping Agni-V Gold Bot...")
+    except Exception as e:
+        logging.error(f"[Main] Critical crash: {e}")
+    finally:
+        if tg_enabled and bot:
+            try:
+                bot.alerts.send_telegram(
+                    f"🔴 <b>Agni-V Gold Bot OFFLINE</b>\n"
+                    f"{'─' * 32}\n"
+                    f"⚠️ The bot has stopped or been disconnected.\n"
+                    f"🏦 Final Balance: <code>${bot._get_balance().get('balance', 0):.2f}</code>"
+                )
+                time.sleep(1)
+            except:
+                pass
+        
         if tg_enabled and tg_handler:
             tg_handler.stop()
         bot.stop()
+        console.print("[bold red]>>> AGNI-V OFFLINE. System exit.[/]")

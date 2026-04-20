@@ -6,8 +6,18 @@ def test_connection():
     load_dotenv(override=True)
     account = int(os.getenv("MT5_ACCOUNT", "0"))
     password = os.getenv("MT5_PASSWORD", "")
+    server = os.getenv("MT5_SERVER", "")
+    path = os.getenv("MT5_PATH", "")
+    
+    print(f"--- MetaTrader 5 Connection Diagnostics ---")
+    print(f"Account:  {account}")
+    print(f"Server:   {server}")
+    print(f"Path:     {path}")
+    print(f"Password: {'*' * len(password)}")
+    print(f"-------------------------------------------")
     
     servers = [
+        server,
         "XMGlobal-MT5 9",
         "XMGlobal-MT5 5",
         "XMGlobal-MT5",

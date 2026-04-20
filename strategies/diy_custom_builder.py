@@ -542,13 +542,14 @@ class DIYCustomStrategy:
 
     # ------------------------------------------------------------------
 
-    def generate_signal(self, df: pd.DataFrame, df_h1: pd.DataFrame = None) -> str:
+    def generate_signal(self, df: pd.DataFrame, df_h1: pd.DataFrame = None, super_sensitive: bool = False) -> str:
         """
         Evaluate the leading indicator and all confirmation filters.
 
         Args:
             df: OHLCV DataFrame (M1/M5)
             df_h1: Optional High-Timeframe DataFrame (H1) for trend confluence.
+            super_sensitive: If True, bypass the confirmation wait and fire immediately.
 
         Returns:
             "BUY" | "SELL" | "HOLD"
@@ -557,12 +558,12 @@ class DIYCustomStrategy:
             return "HOLD"
 
         try:
-            return self._evaluate(df, df_h1)
+            return self._evaluate(df, df_h1, super_sensitive=super_sensitive)
         except Exception as e:
             logger.exception(f"[DIY] generate_signal error: {e}")
             return "HOLD"
 
-    def _evaluate(self, df: pd.DataFrame, df_h1: pd.DataFrame = None) -> str:
+    def _evaluate(self, df: pd.DataFrame, df_h1: pd.DataFrame = None, super_sensitive: bool = False) -> str:
         # --- Step 0: Regime Detection (ADX) ---
         adx_threshold = self.config.get("regime_adx_threshold", 20.0)
         adx_val = self._last_metrics.get("adx", adx_threshold)
@@ -604,22 +605,128 @@ class DIYCustomStrategy:
             h1_bearish = float(h1_close.iloc[-1]) < float(h1_ema.iloc[-1])
 
         new_direction: Optional[str] = None
-        if li_long:
-            if not self.strict_htf_trend or h1_bullish:
-                new_direction = "BUY"
+        is_ghost = self.config.get("ghost_mode", False)
+
+        if is_ghost:
+            # ── GHOST MODE 2.0: VELOCITY STRIKE (EMA 9) ──
+            # In Ghost Mode, we do NOT require a clear H1 trend.
+            # The EMA9 pulse + Volume Force alone decide direction.
+            # The Momentum Guard in Step 1.6 is the safety net.
+            close = df["close"]
+            ema9  = _ema(close, 9)
+            curr_price = float(close.iloc[-1])
+            curr_ema9  = float(ema9.iloc[-1])
+
+            # Buyer/Seller Fight (Volume Force)
+            # Compare current volume to average volume
+            vol = df["volume"]
+            avg_vol = float(vol.tail(14).mean())
+            curr_vol = float(vol.iloc[-1])
+            vol_force = curr_vol > (avg_vol * 1.2)  # 20% spike = "fight" is on
+            # ── Ghost Mode 3.0: Structural Pattern Recognition (Double Top / Bottom) ──
+            recent_lows = df["low"].tail(30).values
+            recent_highs = df["high"].tail(30).values
+            
+            # The "Swing Low/High" area minus the extreme recent candles to ensure it's a historical test
+            past_low = min(recent_lows[:-5])
+            past_high = max(recent_highs[:-5])
+            
+            # Is price currently testing these historical zones? (Buffer ~0.50 pts / 5 pips)
+            testing_support = abs(curr_price - past_low) <= 0.60
+            testing_resistance = abs(past_high - curr_price) <= 0.60
+
+            # ── Determine Signal ──
+            # First, check for structural W / M traps & reversals
+            if testing_support:
+                if curr_price > curr_ema9: 
+                    # Right leg of the 'W' pattern bouncing up
+                    new_direction = "BUY"
+                    logger.info(f"[DIY] 👻 GHOST PATTERN STRIKE: BUY (W-Pattern Double Bottom Bounce | Support={past_low:.2f})")
+                elif curr_price < curr_ema9:
+                    # Trapped at the bottom (Red arrow in user's image) - block the sell
+                    logger.info(f"[DIY] 🛡️ PATTERN GUARD: Blocked SELL (Trapped at Double Bottom Support={past_low:.2f})")
+                    new_direction = None
+            elif testing_resistance:
+                if curr_price < curr_ema9:
+                    # Right leg of the 'M' pattern cleanly rejecting down
+                    new_direction = "SELL"
+                    logger.info(f"[DIY] 👻 GHOST PATTERN STRIKE: SELL (M-Pattern Double Top Rejection | Resistance={past_high:.2f})")
+                elif curr_price > curr_ema9:
+                    # Trapped at the top - block the buy
+                    logger.info(f"[DIY] 🛡️ PATTERN GUARD: Blocked BUY (Trapped at Double Top Resistance={past_high:.2f})")
+                    new_direction = None
             else:
-                logger.debug("[DIY] Signal blocked: Leading=BUY but H1 Trend=BEARISH (Strict Mode ON)")
-        elif li_short:
-            if not self.strict_htf_trend or h1_bearish:
-                new_direction = "SELL"
-            else:
-                logger.debug("[DIY] Signal blocked: Leading=SELL but H1 Trend=BULLISH (Strict Mode ON)")
+                # Normal Velocity Strike
+                if curr_price > curr_ema9 and vol_force:
+                    new_direction = "BUY"
+                elif curr_price < curr_ema9 and vol_force:
+                    new_direction = "SELL"
+                elif curr_price > curr_ema9:
+                    new_direction = "BUY"
+                elif curr_price < curr_ema9:
+                    new_direction = "SELL"
+
+            if new_direction:
+                logger.info(
+                    f"[DIY] 👻 GHOST VELOCITY STRIKE: {new_direction} "
+                    f"(Price={curr_price:.2f} vs EMA9={curr_ema9:.2f} | VolForce={vol_force})"
+                )
+        else:
+            # NORMAL MODE: Stable Leading Indicator (2 EMA cross etc)
+            if li_long:
+                if not self.strict_htf_trend or h1_bullish:
+                    new_direction = "BUY"
+                else:
+                    logger.debug("[DIY] Signal blocked: Leading=BUY but H1 Trend=BEARISH (Strict Mode ON)")
+            elif li_short:
+                if not self.strict_htf_trend or h1_bearish:
+                    new_direction = "SELL"
+                else:
+                    logger.debug("[DIY] Signal blocked: Leading=SELL but H1 Trend=BULLISH (Strict Mode ON)")
 
         # --- Step 3: Compute Dashboard metrics ---
         try:
             self._update_dashboard_metrics(df)
         except Exception as e:
             logger.debug(f"[DIY] update metrics error: {e}")
+
+        # --- Step 1.6: Super Sensitive / Ghost / Immediate Entry ---
+        if super_sensitive and new_direction is not None:
+            is_ghost = self.config.get("ghost_mode", False)
+            
+            # ── Momentum Guard (Anti-Bounce Filter) ───────────────────────────
+            mom = self._last_metrics.get("momentum", "Neutral")
+            if not is_ghost:
+                if new_direction == "SELL" and mom == "Bullish":
+                    logger.info(f"[DIY] 🛡️ Super Sensitive Momentum Guard: SELL blocked — momentum is BULLISH")
+                    return "HOLD"
+                if new_direction == "BUY" and mom == "Bearish":
+                    logger.info(f"[DIY] 🛡️ Super Sensitive Momentum Guard: BUY blocked — momentum is BEARISH")
+                    return "HOLD"
+
+            # ── RSI Entry Timing Filter (Smart Ghost Variant) ─────────────────
+            rsi = self._last_metrics.get("rsi", 50.0)
+            
+            if is_ghost:
+                # Ghost Mode: Very aggressive but still follows Trend
+                rsi_ob = self.config.get("ghost_rsi_ob", 80)
+                rsi_os = self.config.get("ghost_rsi_os", 20)
+                pulse_label = "👻 GHOST PULSE"
+            else:
+                rsi_ob = self.config.get("rsi_overbought_block", 65)
+                rsi_os = self.config.get("rsi_oversold_block", 35)
+                pulse_label = "🔥 SUPER SENSITIVE"
+
+            if new_direction == "BUY" and rsi > rsi_ob:
+                logger.info(f"[DIY] 🛡️ RSI Block: {new_direction} RSI={rsi:.1f} > {rsi_ob}")
+                return "HOLD"
+            if new_direction == "SELL" and rsi < rsi_os:
+                logger.info(f"[DIY] 🛡️ RSI Block: {new_direction} RSI={rsi:.1f} < {rsi_os}")
+                return "HOLD"
+
+            logger.info(f"[DIY] {pulse_label} TRIGGER: {new_direction} (Immediate Execute | Mom={mom} | RSI={rsi:.1f})")
+            self.reset()
+            return new_direction
 
         # --- Step 1.6: Immediate Sideways Entry (Bypass Pending/Confirm) ---
         if is_sideways and new_direction is not None:
@@ -629,14 +736,24 @@ class DIYCustomStrategy:
              self._pending_bars      = 0
              return new_direction
 
-        # --- Step 2: Manage pending state ---
-        if new_direction is not None:
-            if self._pending_direction is None:
-                # Fresh signal from leading indicator
+        # --- Step 2: Confirmation Filters ---
+        if self._pending_direction is None and new_direction is not None:
+            # Bypassed in Ghost Mode
+            is_ghost = self.config.get("ghost_mode", False)
+            if is_ghost:
                 self._pending_direction = new_direction
-                self._pending_bars      = 0
-                logger.debug(f"[DIY] Pending signal set: {new_direction}")
-            elif self.alternate_signal and new_direction != self._pending_direction:
+                self._pending_bars = 0 # No wait
+                self._last_metrics["active_filters"] = "GHOST_BYPASS"
+            else:
+                # Normal mode: Run confirmations
+                passes, active_filters = self._evaluate_filters(df)
+                if passes:
+                    self._pending_direction = new_direction
+                    self._pending_bars      = 0
+                    self._last_metrics["active_filters"] = str(active_filters)
+                else:
+                    logger.debug(f"[DIY] Confirming signal {new_direction}... waiting for filter confluence.")
+        elif self._pending_direction is not None and new_direction is not None and new_direction != self._pending_direction:
                 # Flip to opposite direction immediately
                 self._pending_direction = new_direction
                 self._pending_bars      = 0
